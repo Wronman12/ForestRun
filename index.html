@@ -1,0 +1,3688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Penda's Forest Run</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #115522; }
+        #score { position: absolute; top: 10px; left: 10px; color: white; font-size: 24px; font-family: Arial, sans-serif; }
+        #colorMilestone { 
+            position: absolute; 
+            top: 40px; 
+            left: 10px; 
+            color: white; 
+            font-size: 16px; 
+            font-family: Arial, sans-serif;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        #gameOverScreen { 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%); 
+            background-color: rgba(0,0,0,0.7); 
+            color: white; 
+            padding: 20px; 
+            border-radius: 10px; 
+            text-align: center; 
+            display: none; 
+        }
+        #startScreen { 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%); 
+            background-color: rgba(0,0,0,0.7); 
+            color: white; 
+            padding: 20px; 
+            border-radius: 10px; 
+            text-align: center; 
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div id="score">Score: 0</div>
+    <div id="colorMilestone">Color Milestone</div>
+    <div id="controls">Left/Right Arrows: Move | Spacebar: Jump</div>
+    <div id="startScreen">
+        <h1>Penda's Forest Run</h1>
+        <p>Use left and right arrow keys to move between paths.<br>
+           Press spacebar to jump over forest animals and obstacles.<br>
+           Collect golden bamboo and avoid forest creatures!</p>
+        <p id="highScoreDisplay">High Score: 0</p>
+        <button id="startButton">Start Game</button>
+    </div>
+    <div id="gameOverScreen">
+        <h1>Game Over!</h1>
+        <p id="finalScore">Your score: 0</p>
+        <p id="newHighScore" style="color: gold; display: none;">New High Score!</p>
+        <button id="restartButton">Play Again</button>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Audio context and sounds
+        let audioContext;
+        const sounds = {};
+        
+        // Initialize audio context on user interaction
+        function initAudioContext() {
+            if (audioContext) return; // Already initialized
+            
+            try {
+                // Create audio context
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                console.log('Audio context created successfully');
+                
+                // Load all sounds
+                loadAllSounds();
+                
+                // Show audio initialized message
+                const audioMessage = document.createElement('div');
+                audioMessage.textContent = 'Sound Enabled!';
+                audioMessage.style.position = 'absolute';
+                audioMessage.style.top = '50%';
+                audioMessage.style.left = '50%';
+                audioMessage.style.transform = 'translate(-50%, -50%)';
+                audioMessage.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                audioMessage.style.color = 'white';
+                audioMessage.style.padding = '20px';
+                audioMessage.style.borderRadius = '10px';
+                audioMessage.style.fontFamily = 'Arial, sans-serif';
+                audioMessage.style.zIndex = '1000';
+                document.body.appendChild(audioMessage);
+                
+                // Remove message after 2 seconds
+                setTimeout(() => {
+                    document.body.removeChild(audioMessage);
+                }, 2000);
+            } catch (e) {
+                console.error('Failed to initialize audio context:', e);
+            }
+        }
+        
+        // Load all game sounds
+        function loadAllSounds() {
+            if (!audioContext) return;
+            
+            console.log('Loading all sounds...');
+            
+            // Game sounds
+            loadSound('coin', 'https://freesound.org/data/previews/270/270304_5123851-lq.mp3'); // Coin collect sound
+            loadSound('jump', 'https://freesound.org/data/previews/368/368463_6687669-lq.mp3'); // Jump sound
+            loadSound('powerup', 'https://freesound.org/data/previews/270/270309_5123851-lq.mp3'); // Power-up sound
+            loadSound('shield', 'https://freesound.org/data/previews/334/334521_5865517-lq.mp3'); // Shield sound
+            loadSound('gameover', 'https://freesound.org/data/previews/362/362420_6687669-lq.mp3'); // Game over sound
+            
+            // Forest ambient sounds
+            loadSound('birds', 'https://freesound.org/data/previews/501/501999_7754464-lq.mp3'); // Birds chirping
+            loadSound('river', 'https://freesound.org/data/previews/169/169293_1862832-lq.mp3'); // River flowing
+            loadSound('wind', 'https://freesound.org/data/previews/131/131124_2398403-lq.mp3'); // Wind sound
+            
+            // Additional game sounds
+            loadSound('footsteps', 'https://freesound.org/data/previews/268/268405_5123851-lq.mp3'); // Running footsteps
+            loadSound('colorChange', 'https://freesound.org/data/previews/270/270315_5123851-lq.mp3'); // Color change sound
+            loadSound('splash', 'https://freesound.org/data/previews/234/234105_3755820-lq.mp3'); // Water splash
+            loadSound('animalSound', 'https://freesound.org/data/previews/368/368737_6687669-lq.mp3'); // Animal sound
+            loadSound('rain', 'https://freesound.org/data/previews/346/346170_5121236-lq.mp3'); // Rain sound
+        }
+        
+        // Load a sound file with better error handling
+        function loadSound(name, url) {
+            if (!audioContext) {
+                console.warn('Cannot load sound - audio context not initialized');
+                return;
+            }
+            
+            console.log(`Attempting to load sound: ${name} from ${url}`);
+            
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.arrayBuffer();
+                })
+                .then(arrayBuffer => {
+                    console.log(`Sound data received for: ${name}, decoding...`);
+                    return audioContext.decodeAudioData(arrayBuffer);
+                })
+                .then(audioBuffer => {
+                    sounds[name] = audioBuffer;
+                    console.log(`Sound loaded successfully: ${name}`);
+                    
+                    // Start ambient sounds once they're loaded
+                    if ((name === 'birds' || name === 'river' || name === 'wind') && gameRunning && musicEnabled) {
+                        playAmbientSounds();
+                    }
+                })
+                .catch(error => {
+                    console.error(`Error loading sound ${name}:`, error);
+                    // Try alternative URL if available
+                    if (url.includes('freesound.org')) {
+                        const backupUrls = {
+                            'coin': 'https://assets.codepen.io/21542/coin.mp3',
+                            'jump': 'https://assets.codepen.io/21542/jump.mp3',
+                            'powerup': 'https://assets.codepen.io/21542/powerup.mp3',
+                            'shield': 'https://assets.codepen.io/21542/shield.mp3',
+                            'gameover': 'https://assets.codepen.io/21542/gameover.mp3'
+                        };
+                        
+                        if (backupUrls[name]) {
+                            console.log(`Trying backup URL for ${name}`);
+                            loadSound(name, backupUrls[name]);
+                        }
+                    }
+                });
+        }
+        
+        // Play a sound with better error handling
+        function playSound(name, options = {}) {
+            if (!audioContext) {
+                console.warn('Cannot play sound - audio context not initialized');
+                return null;
+            }
+            
+            if (!sounds[name]) {
+                console.warn(`Sound not available: ${name}`);
+                return null;
+            }
+            
+            // Don't play sound effects if disabled
+            if (!soundEnabled && name !== 'birds' && name !== 'river' && name !== 'wind') {
+                return null;
+            }
+            
+            try {
+                // Resume audio context if it's suspended (browser policy)
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume().then(() => {
+                        console.log('Audio context resumed successfully');
+                    });
+                }
+                
+                // Create source
+                const source = audioContext.createBufferSource();
+                source.buffer = sounds[name];
+                
+                // Create gain node for volume control
+                const gainNode = audioContext.createGain();
+                
+                // Set volume (default to 1.0)
+                let volume = options.volume !== undefined ? options.volume : 1.0;
+                
+                // Apply master volume for sound effects
+                if (name !== 'birds' && name !== 'river' && name !== 'wind') {
+                    volume *= soundVolume;
+                }
+                
+                gainNode.gain.value = volume;
+                
+                // Create stereo panner for spatial audio
+                let finalNode = gainNode;
+                
+                if (options.pan !== undefined) {
+                    const pannerNode = audioContext.createStereoPanner();
+                    pannerNode.pan.value = options.pan; // -1 (left) to 1 (right)
+                    source.connect(pannerNode);
+                    pannerNode.connect(gainNode);
+                    finalNode = gainNode;
+                } else {
+                    source.connect(gainNode);
+                }
+                
+                // Connect to destination
+                finalNode.connect(audioContext.destination);
+                
+                // Set playback rate for pitch effects
+                if (options.rate !== undefined) {
+                    source.playbackRate.value = options.rate;
+                }
+                
+                // Play the sound
+                source.start(0);
+                console.log(`Playing sound: ${name}`);
+                
+                // Return the source for potential later manipulation
+                return source;
+            } catch (e) {
+                console.error('Error playing sound:', e);
+                return null;
+            }
+        }
+        
+        // Game state
+        let gameRunning = false;
+        let score = 0;
+        let highScore = localStorage.getItem('pendaHighScore') || 0; // Load high score from local storage
+        let lane = 0; // Current lane: -1 (left), 0 (center), 1 (right)
+        let speed = 0.2; // Speed of environment movement
+        let distanceTraveled = 0;
+        let difficulty = 1;
+        let lastTime = 0;
+        let lastColorChangeScore = 0; // Track when we last changed color
+        let currentColorIndex = 0;
+        
+        // Color palette for panda body
+        const pandaColors = [
+            0xffffff, // White (default)
+            0xffcccc, // Light pink
+            0xccffcc, // Light green
+            0xccccff, // Light blue
+            0xffffcc, // Light yellow
+            0xffccff, // Light purple
+            0xccffff, // Light cyan
+            0xffddaa  // Light orange
+        ];
+        
+        // Power-up states
+        let hasShield = false;
+        let shieldTime = 0;
+        let hasSpeedBoost = false;
+        let speedBoostTime = 0;
+        let hasMagnet = false;
+        let magnetTime = 0;
+        let shieldMesh = null; // Reference to the shield mesh
+        
+        // Jump physics
+        let isJumping = false;
+        let jumpVelocity = 0;
+        let jumpHeight = 0;
+        const gravity = 0.008; // Reduced gravity for higher jumps
+        const initialJumpVelocity = 0.35; // Increased initial velocity for higher jumps
+        
+        // Performance optimization
+        const lowDetailMode = window.innerWidth < 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        // Initialize Three.js components
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x115522); // Forest green background
+        
+        // Only use fog in high detail mode
+        if (!lowDetailMode) {
+            scene.fog = new THREE.Fog(0x115522, 20, 50); // Green fog for forest atmosphere
+        }
+        
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ 
+            canvas: document.getElementById('gameCanvas'),
+            antialias: !lowDetailMode, // Disable antialiasing on low-end devices
+            powerPreference: "high-performance"
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        
+        // Reduce shadow quality on low-end devices
+        renderer.shadowMap.enabled = !lowDetailMode;
+        if (!lowDetailMode) {
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        }
+
+        // Position and orient the camera
+        camera.position.set(0, 5, 10);
+        camera.lookAt(0, 0, 0);
+
+        // Add lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.5); // Soft ambient light
+        scene.add(ambientLight);
+        
+        // Main directional light (sun)
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); // Increased intensity
+        directionalLight.position.set(5, 10, 5); // Position above and to the side for better shadows
+        directionalLight.lookAt(0, 0, 0);
+        
+        // Improved shadow settings
+        if (!lowDetailMode) {
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 1024; // Increased from 512
+            directionalLight.shadow.mapSize.height = 1024; // Increased from 512
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 50;
+            directionalLight.shadow.camera.left = -15;
+            directionalLight.shadow.camera.right = 15;
+            directionalLight.shadow.camera.top = 15;
+            directionalLight.shadow.camera.bottom = -15;
+            directionalLight.shadow.bias = -0.001; // Reduce shadow acne
+            
+            // Helper to visualize light camera (uncomment for debugging)
+            // const helper = new THREE.CameraHelper(directionalLight.shadow.camera);
+            // scene.add(helper);
+        }
+        scene.add(directionalLight);
+        
+        // Add a spotlight to illuminate the path ahead
+        const spotlight = new THREE.SpotLight(0xffffff, 0.8);
+        spotlight.position.set(0, 10, 0);
+        spotlight.angle = Math.PI / 4;
+        spotlight.penumbra = 0.2; // Increased for softer edge
+        spotlight.decay = 1.5;
+        spotlight.distance = 60; // Increased range
+        
+        // Only enable shadows in high detail mode
+        if (!lowDetailMode) {
+            spotlight.castShadow = true;
+            spotlight.shadow.mapSize.width = 512;
+            spotlight.shadow.mapSize.height = 512;
+            spotlight.shadow.bias = -0.0005;
+        }
+        scene.add(spotlight);
+        
+        // Add subtle colored point lights for atmosphere
+        if (!lowDetailMode) {
+            // Blue light for water areas
+            const blueLight = new THREE.PointLight(0x0044ff, 0.5, 15);
+            blueLight.position.set(-5, 2, -10);
+            blueLight.castShadow = true;
+            blueLight.shadow.bias = -0.0005;
+            blueLight.userData = {
+                dayIntensity: 0.3,
+                nightIntensity: 0.8
+            };
+            scene.add(blueLight);
+            
+            // Green light for forest areas
+            const greenLight = new THREE.PointLight(0x00ff44, 0.3, 15);
+            greenLight.position.set(5, 2, -20);
+            greenLight.castShadow = true;
+            greenLight.shadow.bias = -0.0005;
+            greenLight.userData = {
+                dayIntensity: 0.2,
+                nightIntensity: 0.6
+            };
+            scene.add(greenLight);
+            
+            // Warm light for general ambiance
+            const warmLight = new THREE.PointLight(0xff8844, 0.4, 20);
+            warmLight.position.set(0, 3, -30);
+            warmLight.castShadow = true;
+            warmLight.shadow.bias = -0.0005;
+            warmLight.userData = {
+                dayIntensity: 0.3,
+                nightIntensity: 0.7
+            };
+            scene.add(warmLight);
+        }
+        
+        // Configure renderer for better shadows
+        if (!lowDetailMode) {
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
+            renderer.physicallyCorrectLights = true; // More realistic lighting
+            renderer.outputEncoding = THREE.sRGBEncoding; // Better color representation
+            renderer.toneMapping = THREE.ACESFilmicToneMapping; // Improved contrast
+            renderer.toneMappingExposure = 1.2; // Brighter overall scene
+        }
+
+        // Create the character "Penda" (a panda made of primitive shapes)
+        const character = new THREE.Group();
+        
+        // Panda body (white)
+        const bodyGeometry = new THREE.SphereGeometry(0.6, lowDetailMode ? 16 : 32, lowDetailMode ? 8 : 16);
+        const bodyMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0xffffff,
+            metalness: 0.1,
+            roughness: 0.8
+        });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.position.y = 0.6;
+        body.name = "body"; // Add name for identification
+        character.add(body);
+        
+        // Panda head (white)
+        const headGeometry = new THREE.SphereGeometry(0.5, lowDetailMode ? 16 : 32, lowDetailMode ? 8 : 16);
+        const head = new THREE.Mesh(headGeometry, bodyMaterial);
+        head.position.set(0, 1.3, 0.2);
+        character.add(head);
+        
+        // Panda ears (black)
+        const earGeometry = new THREE.SphereGeometry(0.2, lowDetailMode ? 8 : 16, lowDetailMode ? 4 : 8);
+        const blackMaterial = new THREE.MeshStandardMaterial({
+            color: 0x222222,
+            metalness: 0.1,
+            roughness: 0.8
+        });
+        
+        const leftEar = new THREE.Mesh(earGeometry, blackMaterial);
+        leftEar.position.set(0.3, 1.7, 0);
+        character.add(leftEar);
+        
+        const rightEar = new THREE.Mesh(earGeometry, blackMaterial);
+        rightEar.position.set(-0.3, 1.7, 0);
+        character.add(rightEar);
+        
+        // Panda eye patches (black)
+        const eyePatchGeometry = new THREE.SphereGeometry(0.25, lowDetailMode ? 8 : 16, lowDetailMode ? 4 : 8);
+        
+        const leftEyePatch = new THREE.Mesh(eyePatchGeometry, blackMaterial);
+        leftEyePatch.position.set(0.25, 1.35, 0.4);
+        leftEyePatch.scale.set(1, 0.7, 0.5);
+        character.add(leftEyePatch);
+        
+        const rightEyePatch = new THREE.Mesh(eyePatchGeometry, blackMaterial);
+        rightEyePatch.position.set(-0.25, 1.35, 0.4);
+        rightEyePatch.scale.set(1, 0.7, 0.5);
+        character.add(rightEyePatch);
+        
+        // Panda eyes (white with black pupils)
+        const eyeGeometry = new THREE.SphereGeometry(0.08, lowDetailMode ? 8 : 16, lowDetailMode ? 4 : 8);
+        const eyeMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            metalness: 0.2,
+            roughness: 0.3
+        });
+        
+        const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        leftEye.position.set(0.25, 1.35, 0.55);
+        character.add(leftEye);
+        
+        const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        rightEye.position.set(-0.25, 1.35, 0.55);
+        character.add(rightEye);
+        
+        // Panda pupils
+        const pupilGeometry = new THREE.SphereGeometry(0.04, lowDetailMode ? 4 : 8, lowDetailMode ? 2 : 4);
+        
+        const leftPupil = new THREE.Mesh(pupilGeometry, blackMaterial);
+        leftPupil.position.set(0.25, 1.35, 0.63);
+        character.add(leftPupil);
+        
+        const rightPupil = new THREE.Mesh(pupilGeometry, blackMaterial);
+        rightPupil.position.set(-0.25, 1.35, 0.63);
+        character.add(rightPupil);
+        
+        // Panda nose (black)
+        const noseGeometry = new THREE.SphereGeometry(0.1, lowDetailMode ? 8 : 16, lowDetailMode ? 4 : 8);
+        const nose = new THREE.Mesh(noseGeometry, blackMaterial);
+        nose.position.set(0, 1.2, 0.65);
+        character.add(nose);
+        
+        // Panda limbs (black)
+        const limbGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.5, lowDetailMode ? 8 : 16);
+        
+        // Arms
+        const leftArm = new THREE.Mesh(limbGeometry, blackMaterial);
+        leftArm.position.set(0.6, 0.6, 0);
+        leftArm.rotation.z = Math.PI / 3;
+        character.add(leftArm);
+        
+        const rightArm = new THREE.Mesh(limbGeometry, blackMaterial);
+        rightArm.position.set(-0.6, 0.6, 0);
+        rightArm.rotation.z = -Math.PI / 3;
+        character.add(rightArm);
+        
+        // Legs
+        const leftLeg = new THREE.Mesh(limbGeometry, blackMaterial);
+        leftLeg.position.set(0.3, 0.25, 0);
+        leftLeg.name = "leftLeg"; // Add name for identification
+        character.add(leftLeg);
+        
+        const rightLeg = new THREE.Mesh(limbGeometry, blackMaterial);
+        rightLeg.position.set(-0.3, 0.25, 0);
+        rightLeg.name = "rightLeg"; // Add name for identification
+        character.add(rightLeg);
+        
+        // Position the character
+        character.position.set(0, 0, 0);
+        
+        if (!lowDetailMode) {
+            character.traverse((object) => {
+                if (object.isMesh) {
+                    object.castShadow = true;
+                    object.receiveShadow = true;
+                }
+            });
+        }
+        scene.add(character);
+
+        // Add a trail effect to the character - only in high detail mode
+        const trail = [];
+        const trailLength = lowDetailMode ? 0 : 3; // No trail in low detail mode
+        const trailDelay = 3;
+        let trailCounter = 0;
+        
+        if (!lowDetailMode) {
+            const trailGeometry = new THREE.SphereGeometry(0.3, 8, 8);
+            const trailMaterial = new THREE.MeshStandardMaterial({
+                color: 0x0088ff,
+                transparent: true,
+                opacity: 0.5
+            });
+            
+            for (let i = 0; i < trailLength; i++) {
+                const trailPart = new THREE.Mesh(trailGeometry, trailMaterial.clone());
+                trailPart.material.opacity = 0.5 - (i / trailLength) * 0.5;
+                trailPart.visible = false;
+                scene.add(trailPart);
+                trail.push(trailPart);
+            }
+        }
+
+        // Define forest environment materials
+        let grassMaterial, riverMaterial, landMaterial;
+        
+        if (!lowDetailMode) {
+            const textureLoader = new THREE.TextureLoader();
+            
+            // Load textures for different terrains
+            const grassTexture = textureLoader.load('https://threejs.org/examples/textures/terrain/grasslight-big.jpg');
+            grassTexture.wrapS = THREE.RepeatWrapping;
+            grassTexture.wrapT = THREE.RepeatWrapping;
+            grassTexture.repeat.set(5, 20);
+            
+            const riverTexture = textureLoader.load('https://threejs.org/examples/textures/water.jpg');
+            riverTexture.wrapS = THREE.RepeatWrapping;
+            riverTexture.wrapT = THREE.RepeatWrapping;
+            riverTexture.repeat.set(5, 20);
+            
+            const landTexture = textureLoader.load('https://threejs.org/examples/textures/terrain/grasslight-big.jpg');
+            landTexture.wrapS = THREE.RepeatWrapping;
+            landTexture.wrapT = THREE.RepeatWrapping;
+            landTexture.repeat.set(5, 20);
+            
+            grassMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x88cc44,
+                roughness: 0.8,
+                map: grassTexture
+            });
+            
+            riverMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x4488ff,
+                roughness: 0.4,
+                metalness: 0.6,
+                map: riverTexture
+            });
+            
+            landMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xaa8866,
+                roughness: 0.9,
+                map: landTexture
+            });
+        } else {
+            // Simpler materials for low detail mode
+            grassMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x88cc44,
+                roughness: 0.8
+            });
+            
+            riverMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x4488ff,
+                roughness: 0.4,
+                metalness: 0.6
+            });
+            
+            landMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xaa8866,
+                roughness: 0.9
+            });
+        }
+        
+        // Function to get a random terrain material
+        function getRandomTerrainMaterial() {
+            const terrainType = Math.random();
+            if (terrainType < 0.33) {
+                return { material: grassMaterial, type: 'grass' };
+            } else if (terrainType < 0.66) {
+                return { material: riverMaterial, type: 'river' };
+            } else {
+                return { material: landMaterial, type: 'land' };
+            }
+        }
+
+        // Define forest environment geometries
+        const floorGeometry = new THREE.PlaneGeometry(10, 100); // Width 10, length 100
+        const wallGeometry = new THREE.PlaneGeometry(100, 5); // Height 5, length 100
+        
+        // Forest side walls (trees and foliage)
+        const forestWallMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x005522,
+            roughness: 0.9,
+            metalness: 0.1
+        });
+        
+        // Forest ceiling (tree canopy)
+        const canopyMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x227733,
+            roughness: 0.8,
+            metalness: 0.1
+        });
+
+        // Create environment segments
+        const segments = [];
+        const numSegments = 3;
+        
+        // Create gap obstacle (invisible box that triggers game over if not jumped)
+        const gapGeometry = new THREE.BoxGeometry(8, 0.1, 3);
+        const gapMaterial = new THREE.MeshStandardMaterial({
+            color: 0x000000,
+            transparent: true,
+            opacity: 0.7 // Increased opacity to make gaps more visible
+        });
+        
+        // Use bamboo instead of coins
+        const bambooGeometry = new THREE.CylinderGeometry(
+            0.1, 0.1, 0.8, 
+            lowDetailMode ? 8 : 16
+        );
+        const bambooMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0xddcc55,
+            metalness: 0.3,
+            roughness: 0.7,
+            emissive: 0x886600,
+            emissiveIntensity: 0.3
+        });
+
+        // Create a forest animal obstacle (fox)
+        function createFox() {
+            const fox = new THREE.Group();
+            
+            // Fox body (orange)
+            const bodyMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xff6622,
+                metalness: 0.1,
+                roughness: 0.8
+            });
+            
+            const body = new THREE.Mesh(
+                new THREE.SphereGeometry(0.5, 12, 8),
+                bodyMaterial
+            );
+            body.scale.set(1.2, 0.8, 1);
+            fox.add(body);
+            
+            // Fox head
+            const head = new THREE.Mesh(
+                new THREE.SphereGeometry(0.3, 12, 8),
+                bodyMaterial
+            );
+            head.position.set(0, 0.2, 0.5);
+            fox.add(head);
+            
+            // Fox ears
+            const earMaterial = bodyMaterial.clone();
+            
+            const leftEar = new THREE.Mesh(
+                new THREE.ConeGeometry(0.1, 0.2, 8),
+                earMaterial
+            );
+            leftEar.position.set(0.15, 0.4, 0.5);
+            leftEar.rotation.x = -Math.PI / 4;
+            fox.add(leftEar);
+            
+            const rightEar = new THREE.Mesh(
+                new THREE.ConeGeometry(0.1, 0.2, 8),
+                earMaterial
+            );
+            rightEar.position.set(-0.15, 0.4, 0.5);
+            rightEar.rotation.x = -Math.PI / 4;
+            fox.add(rightEar);
+            
+            // Fox eyes
+            const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+            
+            const leftEye = new THREE.Mesh(
+                new THREE.SphereGeometry(0.05, 8, 8),
+                eyeMaterial
+            );
+            leftEye.position.set(0.1, 0.25, 0.75);
+            fox.add(leftEye);
+            
+            const rightEye = new THREE.Mesh(
+                new THREE.SphereGeometry(0.05, 8, 8),
+                eyeMaterial
+            );
+            rightEye.position.set(-0.1, 0.25, 0.75);
+            fox.add(rightEye);
+            
+            // Fox tail
+            const tail = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.1, 0.2, 0.6, 8),
+                bodyMaterial
+            );
+            tail.position.set(0, 0.1, -0.6);
+            tail.rotation.x = Math.PI / 4;
+            fox.add(tail);
+            
+            // Set userData to identify as obstacle
+            fox.userData.isObstacle = true;
+            fox.userData.type = 'fox';
+            
+            return fox;
+        }
+        
+        // Create a forest animal obstacle (bear)
+        function createBear() {
+            const bear = new THREE.Group();
+            
+            // Bear body (brown)
+            const bodyMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x885533,
+                metalness: 0.1,
+                roughness: 0.9
+            });
+            
+            const body = new THREE.Mesh(
+                new THREE.SphereGeometry(0.7, 16, 12),
+                bodyMaterial
+            );
+            body.scale.set(1, 0.8, 1.2);
+            bear.add(body);
+            
+            // Bear head
+            const head = new THREE.Mesh(
+                new THREE.SphereGeometry(0.4, 16, 12),
+                bodyMaterial
+            );
+            head.position.set(0, 0.3, 0.6);
+            bear.add(head);
+            
+            // Bear ears
+            const leftEar = new THREE.Mesh(
+                new THREE.SphereGeometry(0.1, 8, 8),
+                bodyMaterial
+            );
+            leftEar.position.set(0.25, 0.6, 0.6);
+            bear.add(leftEar);
+            
+            const rightEar = new THREE.Mesh(
+                new THREE.SphereGeometry(0.1, 8, 8),
+                bodyMaterial
+            );
+            rightEar.position.set(-0.25, 0.6, 0.6);
+            bear.add(rightEar);
+            
+            // Bear eyes
+            const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+            
+            const leftEye = new THREE.Mesh(
+                new THREE.SphereGeometry(0.05, 8, 8),
+                eyeMaterial
+            );
+            leftEye.position.set(0.15, 0.4, 0.9);
+            bear.add(leftEye);
+            
+            const rightEye = new THREE.Mesh(
+                new THREE.SphereGeometry(0.05, 8, 8),
+                eyeMaterial
+            );
+            rightEye.position.set(-0.15, 0.4, 0.9);
+            bear.add(rightEye);
+            
+            // Bear snout
+            const snout = new THREE.Mesh(
+                new THREE.SphereGeometry(0.15, 8, 8),
+                bodyMaterial
+            );
+            snout.position.set(0, 0.25, 1);
+            bear.add(snout);
+            
+            // Bear nose
+            const nose = new THREE.Mesh(
+                new THREE.SphereGeometry(0.05, 8, 8),
+                new THREE.MeshStandardMaterial({ color: 0x000000 })
+            );
+            nose.position.set(0, 0.25, 1.1);
+            bear.add(nose);
+            
+            // Set userData to identify as obstacle
+            bear.userData.isObstacle = true;
+            bear.userData.type = 'bear';
+            
+            return bear;
+        }
+        
+        // Create a forest animal obstacle (snake)
+        function createSnake() {
+            const snake = new THREE.Group();
+            
+            // Snake body (green)
+            const bodyMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x33aa33,
+                metalness: 0.3,
+                roughness: 0.7
+            });
+            
+            // Create snake segments
+            const segments = 5;
+            const segmentRadius = 0.15;
+            const segmentLength = 0.3;
+            
+            for (let i = 0; i < segments; i++) {
+                const segment = new THREE.Mesh(
+                    new THREE.SphereGeometry(segmentRadius, 12, 8),
+                    bodyMaterial
+                );
+                
+                // Position in a curved line
+                const angle = (i / segments) * Math.PI;
+                segment.position.set(
+                    Math.sin(angle) * segmentLength * 2,
+                    0,
+                    -i * segmentLength
+                );
+                
+                snake.add(segment);
+            }
+            
+            // Snake head (slightly larger)
+            const head = new THREE.Mesh(
+                new THREE.SphereGeometry(segmentRadius * 1.2, 12, 8),
+                bodyMaterial
+            );
+            head.position.copy(snake.children[0].position);
+            head.position.z += segmentRadius * 1.5;
+            snake.add(head);
+            
+            // Snake eyes
+            const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+            
+            const leftEye = new THREE.Mesh(
+                new THREE.SphereGeometry(0.03, 8, 8),
+                eyeMaterial
+            );
+            leftEye.position.copy(head.position);
+            leftEye.position.x += 0.1;
+            leftEye.position.z += 0.1;
+            snake.add(leftEye);
+            
+            const rightEye = new THREE.Mesh(
+                new THREE.SphereGeometry(0.03, 8, 8),
+                eyeMaterial
+            );
+            rightEye.position.copy(head.position);
+            rightEye.position.x -= 0.1;
+            rightEye.position.z += 0.1;
+            snake.add(rightEye);
+            
+            // Set userData to identify as obstacle
+            snake.userData.isObstacle = true;
+            snake.userData.type = 'snake';
+            
+            return snake;
+        }
+
+        // Function to create a gap with visual indicators
+        function createGap() {
+            const gapGroup = new THREE.Group();
+            
+            // The actual gap collision detector
+            const gap = new THREE.Mesh(gapGeometry, gapMaterial);
+            gap.userData.isGap = true;
+            gapGroup.add(gap);
+            
+            // Add visual indicators on both sides of the gap
+            const indicatorGeometry = new THREE.BoxGeometry(10, 0.1, 0.5);
+            const indicatorMaterial = new THREE.MeshStandardMaterial({
+                color: 0xff0000,
+                emissive: 0xff0000,
+                emissiveIntensity: 0.5
+            });
+            
+            // Front edge indicator
+            const frontIndicator = new THREE.Mesh(indicatorGeometry, indicatorMaterial);
+            frontIndicator.position.z = -1.5;
+            gapGroup.add(frontIndicator);
+            
+            // Back edge indicator
+            const backIndicator = new THREE.Mesh(indicatorGeometry, indicatorMaterial);
+            backIndicator.position.z = 1.5;
+            gapGroup.add(backIndicator);
+            
+            // Set the entire group as a gap for identification
+            gapGroup.userData.isGap = true;
+            
+            return gapGroup;
+        }
+
+        // Function to create and position segments
+        function createSegments() {
+            // Clear existing segments if any
+            segments.forEach(segment => {
+                scene.remove(segment);
+            });
+            segments.length = 0;
+            
+            for (let i = -1; i < numSegments - 1; i++) {
+                const segment = new THREE.Group();
+                
+                // Get random terrain type for this segment
+                const terrain = getRandomTerrainMaterial();
+                
+                // Create floor with the selected terrain
+                const floor = new THREE.Mesh(floorGeometry, terrain.material);
+                floor.rotation.x = -Math.PI / 2; // Lay flat
+                floor.position.y = 0;
+                floor.userData.terrainType = terrain.type; // Store terrain type for gameplay effects
+                if (!lowDetailMode) floor.receiveShadow = true;
+                segment.add(floor);
+                
+                // Create forest walls
+                const leftWall = new THREE.Mesh(wallGeometry, forestWallMaterial);
+                leftWall.position.set(-5, 2.5, 0); // Left side
+                leftWall.rotation.y = Math.PI / 2;
+                if (!lowDetailMode) leftWall.receiveShadow = true;
+                segment.add(leftWall);
+                
+                const rightWall = new THREE.Mesh(wallGeometry, forestWallMaterial);
+                rightWall.position.set(5, 2.5, 0); // Right side
+                rightWall.rotation.y = -Math.PI / 2;
+                if (!lowDetailMode) rightWall.receiveShadow = true;
+                segment.add(rightWall);
+                
+                // Add tree canopy ceiling
+                const ceiling = new THREE.Mesh(floorGeometry, canopyMaterial);
+                ceiling.rotation.x = Math.PI / 2; // Lay flat but upside down
+                ceiling.position.y = 5;
+                if (!lowDetailMode) ceiling.receiveShadow = true;
+                segment.add(ceiling);
+                
+                // Add forest decorations based on terrain type
+                if (terrain.type === 'grass') {
+                    // Add trees on grass terrain
+                    const treeCount = lowDetailMode ? 2 : 4;
+                    for (let i = 0; i < treeCount; i++) {
+                        const tree = createTree(0.8 + Math.random() * 0.4);
+                        // Position trees along the sides
+                        const side = Math.random() > 0.5 ? 1 : -1;
+                        const offset = 3.5 + Math.random() * 1;
+                        tree.position.set(side * offset, 0, -Math.random() * 90 - 5);
+                        segment.add(tree);
+                    }
+                    
+                    // Add bushes and flowers
+                    const bushCount = lowDetailMode ? 3 : 6;
+                    for (let i = 0; i < bushCount; i++) {
+                        const bush = createBush(0.6 + Math.random() * 0.4);
+                        const side = Math.random() > 0.5 ? 1 : -1;
+                        const offset = 2.5 + Math.random() * 2;
+                        bush.position.set(side * offset, 0, -Math.random() * 90 - 5);
+                        segment.add(bush);
+                        
+                        // Add flowers near some bushes
+                        if (Math.random() > 0.5) {
+                            const flowers = createFlowers(0.8 + Math.random() * 0.4);
+                            flowers.position.copy(bush.position);
+                            flowers.position.x += (Math.random() - 0.5) * 0.5;
+                            flowers.position.z += (Math.random() - 0.5) * 0.5;
+                            segment.add(flowers);
+                        }
+                    }
+                } else if (terrain.type === 'river') {
+                    // Add rocks and waterfalls on river terrain
+                    const rockCount = lowDetailMode ? 3 : 6;
+                    for (let i = 0; i < rockCount; i++) {
+                        const rock = createRock(0.4 + Math.random() * 0.6);
+                        const side = Math.random() > 0.5 ? 1 : -1;
+                        const offset = 2 + Math.random() * 2.5;
+                        rock.position.set(side * offset, 0, -Math.random() * 90 - 5);
+                        segment.add(rock);
+                    }
+                    
+                    // Add a waterfall (less frequent)
+                    if (Math.random() > 0.7) {
+                        const waterfall = createWaterfall(1 + Math.random() * 0.5);
+                        const side = Math.random() > 0.5 ? 1 : -1;
+                        waterfall.position.set(side * 4, 0, -Math.random() * 70 - 20);
+                        segment.add(waterfall);
+                    }
+                } else if (terrain.type === 'land') {
+                    // Add rocks and sparse vegetation on land terrain
+                    const rockCount = lowDetailMode ? 4 : 8;
+                    for (let i = 0; i < rockCount; i++) {
+                        const rock = createRock(0.3 + Math.random() * 0.7);
+                        const side = Math.random() > 0.3 ? (Math.random() > 0.5 ? 1 : -1) : 0; // Some rocks in the middle
+                        const offset = side === 0 ? (Math.random() * 4 - 2) : (3 + Math.random() * 1.5) * side;
+                        rock.position.set(offset, 0, -Math.random() * 90 - 5);
+                        segment.add(rock);
+                    }
+                    
+                    // Add sparse trees
+                    const treeCount = lowDetailMode ? 1 : 2;
+                    for (let i = 0; i < treeCount; i++) {
+                        const tree = createTree(0.7 + Math.random() * 0.3);
+                        const side = Math.random() > 0.5 ? 1 : -1;
+                        const offset = 4 + Math.random() * 0.5;
+                        tree.position.set(side * offset, 0, -Math.random() * 90 - 5);
+                        segment.add(tree);
+                    }
+                }
+                
+                // Add obstacles and coins
+                // Add multiple obstacles per segment - reduce count in low detail mode
+                const obstacleCount = lowDetailMode ? 2 : 3;
+                for (let i = 0; i < obstacleCount; i++) {
+                    // Choose a random obstacle type
+                    let obstacle;
+                    const obstacleType = Math.random();
+                    
+                    if (obstacleType < 0.5) {
+                        obstacle = createFox();
+                    } else if (obstacleType < 0.8) {
+                        obstacle = createBear();
+                    } else {
+                        obstacle = createSnake();
+                        // Snakes are positioned differently
+                        const obstacleLane = Math.floor(Math.random() * 3) - 1;
+                        obstacle.position.set(obstacleLane * 2, 0.1, -Math.random() * 90 - 5); // Lower to the ground
+                        segment.add(obstacle);
+                        continue; // Skip the normal positioning
+                    }
+                    
+                    const obstacleLane = Math.floor(Math.random() * 3) - 1; // Lanes: -1, 0, 1
+                    obstacle.position.set(obstacleLane * 2, 0.5, -Math.random() * 90 - 5);
+                    segment.add(obstacle);
+                }
+                
+                // Add a gap obstacle - fewer in low detail mode
+                if (Math.random() > (lowDetailMode ? 0.7 : 0.5)) {
+                    const gap = createGap();
+                    const gapLane = Math.floor(Math.random() * 3) - 1;
+                    const gapZ = -Math.random() * 70 - 20;
+                    gap.position.set(gapLane * 2, 0, gapZ);
+                    segment.add(gap);
+                }
+                
+                // Add power-ups (less frequent than obstacles)
+                if (Math.random() > 0.7) {
+                    // Choose a random power-up type
+                    const powerUpTypes = ['shield', 'speedBoost', 'magnet'];
+                    const type = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
+                    const powerUp = createPowerUp(type);
+                    
+                    const powerUpLane = Math.floor(Math.random() * 3) - 1;
+                    const powerUpZ = -Math.random() * 90 - 5;
+                    powerUp.position.set(powerUpLane * 2, 1.5, powerUpZ); // Position higher than obstacles
+                    segment.add(powerUp);
+                }
+
+                // Add multiple bamboo stalks per segment - reduce count in low detail mode
+                const bambooCount = lowDetailMode ? 3 : 5;
+                for (let i = 0; i < bambooCount; i++) {
+                    const bamboo = new THREE.Mesh(bambooGeometry, bambooMaterial);
+                    const bambooLane = Math.floor(Math.random() * 3) - 1;
+                    const bambooZ = -Math.random() * 90 - 5;
+                    // Randomly place bamboo
+                    const bambooY = 0.4; // Half height of bamboo
+                    bamboo.position.set(bambooLane * 2, bambooY, bambooZ);
+                    bamboo.rotation.x = Math.PI / 2; // Stand upright
+                    segment.add(bamboo);
+                }
+                
+                segment.position.z = i * 100; // Position segments along z-axis
+                scene.add(segment);
+                segments.push(segment);
+            }
+        }
+
+        // Handle user input for lateral movement and jumping
+        document.addEventListener('keydown', (event) => {
+            if (!gameRunning) return;
+            
+            if (event.key === 'ArrowLeft' && lane > -1) {
+                lane--;
+            } else if (event.key === 'ArrowRight' && lane < 1) {
+                lane++;
+            } else if (event.key === ' ' && !isJumping) { // Spacebar for jump
+                isJumping = true;
+                jumpVelocity = initialJumpVelocity;
+                // Play jump sound
+                playSound('jump');
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Animation loop with time-based movement
+        function animate(timestamp) {
+            requestAnimationFrame(animate);
+            
+            // Calculate delta time for smooth animation regardless of frame rate
+            if (!lastTime) lastTime = timestamp;
+            const deltaTime = Math.min((timestamp - lastTime) / 16.67, 3); // normalize to ~60fps, cap at 3x
+            lastTime = timestamp;
+
+            // Always render the scene
+            renderer.render(scene, camera);
+            
+            // If game is not running, don't update game state
+            if (!gameRunning) {
+                return;
+            }
+
+            // Update distance traveled and increase difficulty
+            distanceTraveled += speed * deltaTime;
+            if (distanceTraveled > 500 * difficulty) {
+                difficulty++;
+                speed += 0.05; // Increase speed as game progresses
+            }
+            
+            // Update power-up timers
+            if (hasShield) {
+                shieldTime -= deltaTime;
+                if (shieldTime <= 0) {
+                    hasShield = false;
+                    // Remove shield visual effect
+                    if (shieldMesh) {
+                        shieldMesh.visible = false;
+                    }
+                }
+            }
+            
+            if (hasSpeedBoost) {
+                speedBoostTime -= deltaTime;
+                if (speedBoostTime <= 0) {
+                    hasSpeedBoost = false;
+                    speed /= 1.5; // Return to normal speed
+                }
+            }
+            
+            if (hasMagnet) {
+                magnetTime -= deltaTime;
+                if (magnetTime <= 0) {
+                    hasMagnet = false;
+                }
+            }
+
+            // Move environment segments
+            segments.forEach(segment => {
+                segment.position.z += speed * deltaTime;
+                if (segment.position.z > 100) {
+                    segment.position.z -= 300; // Recycle to back
+                    // Reset obstacles and coins
+                    segment.children.forEach(child => {
+                        if (child.userData && child.userData.isObstacle) {
+                            // Reposition obstacle based on type
+                            if (child.userData.type === 'snake') {
+                                // Snakes are positioned lower to the ground
+                                const obstacleLane = Math.floor(Math.random() * 3) - 1;
+                                child.position.set(obstacleLane * 2, 0.1, -Math.random() * 90 - 5);
+                            } else {
+                                // Regular obstacles (fox, bear)
+                                const obstacleLane = Math.floor(Math.random() * 3) - 1;
+                                child.position.set(obstacleLane * 2, 0.5, -Math.random() * 90 - 5);
+                                // Reset rotation
+                                child.rotation.y = 0;
+                                child.rotation.z = 0;
+                            }
+                        } else if (child.userData && child.userData.isPowerUp) {
+                            // Reposition power-up or remove it (50% chance)
+                            if (Math.random() > 0.5) {
+                                const powerUpLane = Math.floor(Math.random() * 3) - 1;
+                                child.position.set(powerUpLane * 2, 1.5, -Math.random() * 90 - 5);
+                                child.visible = true;
+                            } else {
+                                child.visible = false;
+                                child.position.z = -1000; // Move far away
+                            }
+                        } else if (child.geometry && child.geometry.type === 'CylinderGeometry') {
+                            const bambooLane = Math.floor(Math.random() * 3) - 1;
+                            // Place bamboo upright
+                            const bambooY = 0.4; // Half height of bamboo
+                            child.position.set(bambooLane * 2, bambooY, -Math.random() * 90 - 5);
+                            child.visible = true; // Make collected bamboo visible again
+                        } else if (child.userData && child.userData.isGap) {
+                            // Reposition gap to a random lane
+                            const gapLane = Math.floor(Math.random() * 3) - 1;
+                            child.position.set(gapLane * 2, 0, -Math.random() * 70 - 20);
+                        }
+                    });
+                }
+            });
+
+            // Update character position with smooth transition for left/right
+            character.position.x += (lane * 2 - character.position.x) * 0.2 * deltaTime;
+            
+            // Animate panda running
+            if (gameRunning) {
+                // Animate legs for running effect
+                const legSpeed = 0.1 * deltaTime;
+                const legAmplitude = 0.3;
+                
+                // Find the legs in the character group by name
+                character.children.forEach(child => {
+                    if (child.name === "leftLeg") {
+                        child.rotation.x = Math.sin(timestamp * 0.01) * legAmplitude;
+                    } else if (child.name === "rightLeg") {
+                        child.rotation.x = Math.sin(timestamp * 0.01 + Math.PI) * legAmplitude;
+                    }
+                });
+                
+                // Find the body in the character group
+                character.children.forEach(child => {
+                    if (child.name === "body") {
+                        // Slight body bob
+                        child.position.y = 0.6 + Math.abs(Math.sin(timestamp * 0.01)) * 0.05;
+                    }
+                });
+                
+                // Play footstep sounds synchronized with leg movement
+                if (!isJumping && sounds['footsteps']) {
+                    // Play footstep sound at the peak of each leg's movement
+                    const footstepTiming = Math.sin(timestamp * 0.01);
+                    
+                    if (footstepTiming > 0.9 && !footstepPlayed) {
+                        playSound('footsteps', { volume: 0.2, rate: 0.8 + speed * 2 });
+                        footstepPlayed = true;
+                    } else if (footstepTiming < 0 && footstepPlayed) {
+                        footstepPlayed = false;
+                    }
+                }
+            }
+            
+            // Update jump physics
+            if (isJumping) {
+                jumpVelocity -= gravity * deltaTime;
+                jumpHeight += jumpVelocity * deltaTime;
+                
+                if (jumpHeight <= 0) {
+                    jumpHeight = 0;
+                    isJumping = false;
+                    jumpVelocity = 0;
+                    
+                    // Play landing sound
+                    playSound('footsteps', { volume: 0.3, rate: 0.6 });
+                }
+                
+                character.position.y = 0.5 + jumpHeight;
+            }
+            
+            // Update trail effect - only in high detail mode
+            if (!lowDetailMode && trailLength > 0) {
+                trailCounter++;
+                if (trailCounter >= trailDelay) {
+                    trailCounter = 0;
+                    
+                    // Shift trail parts
+                    for (let i = trail.length - 1; i > 0; i--) {
+                        trail[i].position.copy(trail[i-1].position);
+                        trail[i].visible = trail[i-1].visible;
+                    }
+                    
+                    // Update first trail part
+                    trail[0].position.copy(character.position);
+                    trail[0].position.z -= 0.5; // Position slightly behind character
+                    trail[0].visible = true;
+                }
+            }
+
+            // Rotate coins for sparkle effect - less rotation in low detail mode
+            segments.forEach(segment => {
+                segment.children.forEach(child => {
+                    if (child.geometry && child.geometry.type === 'TorusGeometry') {
+                        child.rotation.z += 0.05 * (lowDetailMode ? 0.5 : 1) * deltaTime;
+                    }
+                    
+                    // Animate spinning blades
+                    if (child.userData && child.userData.type === 'blade') {
+                        // Rotate the hub (first child)
+                        if (child.children.length > 0) {
+                            child.children[0].rotation.z += child.userData.rotationSpeed * deltaTime;
+                        }
+                    }
+                    
+                    // Animate power-ups (bobbing up and down, rotating)
+                    if (child.userData && child.userData.isPowerUp && child.visible) {
+                        child.rotation.y += 0.03 * deltaTime;
+                        child.position.y = 1.5 + Math.sin(timestamp * 0.003) * 0.1;
+                    }
+                    
+                    // Animate waterfalls
+                    if (child.userData && child.userData.animateWaterfall) {
+                        // Find the water stream (first child)
+                        if (child.children.length > 0) {
+                            const stream = child.children[0];
+                            
+                            // Create water droplet particles occasionally
+                            if (Math.random() > 0.9 && !lowDetailMode) {
+                                const droplet = new THREE.Mesh(
+                                    new THREE.SphereGeometry(0.05, 4, 4),
+                                    new THREE.MeshStandardMaterial({
+                                        color: 0x4FC3F7,
+                                        transparent: true,
+                                        opacity: 0.7
+                                    })
+                                );
+                                
+                                // Position at random point in the waterfall
+                                droplet.position.x = stream.position.x + (Math.random() - 0.5) * 0.8;
+                                droplet.position.y = stream.position.y + Math.random() * 1;
+                                droplet.position.z = stream.position.z;
+                                
+                                // Add to the scene
+                                child.add(droplet);
+                                
+                                // Add velocity for animation
+                                droplet.userData = {
+                                    velocity: 0.05 + Math.random() * 0.05,
+                                    lifespan: 30 // frames
+                                };
+                            }
+                            
+                            // Animate existing droplets
+                            for (let i = child.children.length - 1; i >= 0; i--) {
+                                const droplet = child.children[i];
+                                if (droplet.userData && droplet.userData.velocity) {
+                                    // Move downward
+                                    droplet.position.y -= droplet.userData.velocity * deltaTime;
+                                    
+                                    // Add slight horizontal movement
+                                    droplet.position.x += (Math.random() - 0.5) * 0.01 * deltaTime;
+                                    
+                                    // Decrease lifespan
+                                    droplet.userData.lifespan -= deltaTime;
+                                    
+                                    // Remove if reached bottom or lifespan ended
+                                    if (droplet.position.y < 0.1 || droplet.userData.lifespan <= 0) {
+                                        child.remove(droplet);
+                                    }
+                                }
+                            }
+                            
+                            // Animate splash at the bottom
+                            if (child.children.length > 0) {
+                                const splash = child.children[child.children.length - 1];
+                                if (splash.geometry && splash.geometry.type === 'CircleGeometry') {
+                                    splash.rotation.z += 0.01 * deltaTime;
+                                    splash.scale.x = 1 + Math.sin(timestamp * 0.01) * 0.1;
+                                    splash.scale.z = 1 + Math.cos(timestamp * 0.01) * 0.1;
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+            
+            // Magnet effect: attract nearby bamboo
+            if (hasMagnet) {
+                const magnetRange = 5; // Range of the magnet effect
+                
+                segments.forEach(segment => {
+                    segment.children.forEach(child => {
+                        if (child.geometry && child.geometry.type === 'CylinderGeometry' && child.visible) {
+                            const globalZ = segment.position.z + child.position.z;
+                            
+                            // Check if bamboo is within range
+                            if (Math.abs(globalZ) < magnetRange) {
+                                // Move bamboo towards character
+                                const moveSpeed = 0.1 * deltaTime;
+                                child.position.x += (character.position.x - child.position.x) * moveSpeed;
+                                child.position.y += (character.position.y - child.position.y) * moveSpeed;
+                                child.position.z += (0 - globalZ) * moveSpeed * 0.5;
+                            }
+                        }
+                    });
+                });
+            }
+
+            // Update spotlight to follow character
+            spotlight.position.x = character.position.x;
+
+            // Collision and collection detection
+            segments.forEach(segment => {
+                segment.children.forEach(child => {
+                    const globalZ = segment.position.z + child.position.z;
+                    
+                    // Obstacle collision - check for monster obstacles
+                    if (child.userData && child.userData.isObstacle) {
+                        // More forgiving collision detection (1.5 instead of 1)
+                        if (Math.abs(globalZ) < 1.5 && 
+                            Math.abs(child.position.x - character.position.x) < 1 &&
+                            Math.abs(child.position.y - character.position.y) < 1) {
+                            
+                            // If we have a shield, don't game over, just remove the shield
+                            if (hasShield) {
+                                hasShield = false;
+                                shieldTime = 0;
+                                // Remove shield visual effect
+                                if (shieldMesh) {
+                                    shieldMesh.visible = false;
+                                }
+                                // Play shield break sound
+                                playSound('shield', { volume: 0.7 });
+                                
+                                // Play animal sound
+                                playSound('animalSound', { 
+                                    volume: 0.5,
+                                    pan: child.position.x > character.position.x ? 0.5 : -0.5 // Pan based on position
+                                });
+                            } else {
+                                gameOver();
+                            }
+                        }
+                        
+                        // Animate based on obstacle type
+                        if (child.userData.type === 'fox') {
+                            // Fox animation - bouncing and tail wagging
+                            child.position.y = 0.5 + Math.sin(timestamp * 0.005) * 0.1;
+                            
+                            // Find and animate the tail
+                            child.children.forEach(part => {
+                                if (part.geometry && part.geometry.type === 'CylinderGeometry') {
+                                    part.rotation.z = Math.sin(timestamp * 0.01) * 0.2;
+                                }
+                            });
+                            
+                            // Occasionally play fox sound
+                            if (Math.random() > 0.997 && Math.abs(globalZ) < 20) {
+                                playSound('animalSound', { 
+                                    volume: 0.3 * (1 - Math.abs(globalZ) / 20),
+                                    rate: 1.2,
+                                    pan: child.position.x > 0 ? 0.5 : -0.5
+                                });
+                            }
+                        } else if (child.userData.type === 'bear') {
+                            // Bear animation - slight rocking
+                            child.rotation.z = Math.sin(timestamp * 0.002) * 0.05;
+                            child.position.y = 0.5 + Math.sin(timestamp * 0.003) * 0.05;
+                            
+                            // Occasionally play bear sound
+                            if (Math.random() > 0.998 && Math.abs(globalZ) < 20) {
+                                playSound('animalSound', { 
+                                    volume: 0.4 * (1 - Math.abs(globalZ) / 20),
+                                    rate: 0.7, // Lower pitch for bear
+                                    pan: child.position.x > 0 ? 0.3 : -0.3
+                                });
+                            }
+                        } else if (child.userData.type === 'snake') {
+                            // Snake animation - slithering
+                            const segments = child.children.length - 3; // Exclude head and eyes
+                            for (let i = 0; i < segments; i++) {
+                                const segment = child.children[i];
+                                const phase = (i / segments) * Math.PI * 2;
+                                segment.position.x = Math.sin(timestamp * 0.005 + phase) * 0.2;
+                            }
+                            
+                            // Occasionally play snake sound
+                            if (Math.random() > 0.996 && Math.abs(globalZ) < 15) {
+                                playSound('animalSound', { 
+                                    volume: 0.2 * (1 - Math.abs(globalZ) / 15),
+                                    rate: 1.5, // Higher pitch for snake
+                                    pan: child.position.x > 0 ? 0.7 : -0.7
+                                });
+                            }
+                        }
+                    } 
+                    // Gap collision - only if not jumping
+                    else if (child.userData && child.userData.isGap) {
+                        // Check if character is over the gap
+                        if (Math.abs(globalZ) < 1.5 && 
+                            Math.abs(child.position.x - character.position.x) < 3) {
+                            
+                            // Only trigger game over if not jumping high enough and no shield
+                            if (character.position.y < 1.0) {
+                                if (hasShield) {
+                                    hasShield = false;
+                                    shieldTime = 0;
+                                    // Remove shield visual effect
+                                    if (shieldMesh) {
+                                        shieldMesh.visible = false;
+                                    }
+                                    // Play shield break sound
+                                    playSound('shield', { volume: 0.7 });
+                                } else {
+                                    gameOver();
+                                }
+                            }
+                        }
+                    }
+                    // Power-up collection
+                    else if (child.userData && child.userData.isPowerUp && child.visible) {
+                        if (Math.abs(globalZ) < 1.5 && 
+                            Math.abs(child.position.x - character.position.x) < 1.5 &&
+                            Math.abs(child.position.y - character.position.y) < 1.5) {
+                            
+                            // Apply power-up effect
+                            if (child.userData.type === 'shield') {
+                                hasShield = true;
+                                shieldTime = 10 * 60; // 10 seconds at 60fps
+                                
+                                // Create shield visual effect (bubble around character)
+                                if (!shieldMesh) {
+                                    const shieldGeometry = new THREE.SphereGeometry(1.2, 16, 16);
+                                    const shieldMaterial = new THREE.MeshStandardMaterial({
+                                        color: 0x0088ff,
+                                        transparent: true,
+                                        opacity: 0.3,
+                                        emissive: 0x0044aa,
+                                        emissiveIntensity: 0.5
+                                    });
+                                    shieldMesh = new THREE.Mesh(shieldGeometry, shieldMaterial);
+                                    character.add(shieldMesh);
+                                } else {
+                                    shieldMesh.visible = true;
+                                }
+                                
+                                playSound('powerup', { volume: 0.7, rate: 1.0 });
+                            } else if (child.userData.type === 'speedBoost') {
+                                hasSpeedBoost = true;
+                                speedBoostTime = 5 * 60; // 5 seconds at 60fps
+                                speed *= 1.5; // Increase speed
+                                playSound('powerup', { volume: 0.7, rate: 1.2 });
+                            } else if (child.userData.type === 'magnet') {
+                                hasMagnet = true;
+                                magnetTime = 8 * 60; // 8 seconds at 60fps
+                                playSound('powerup', { volume: 0.7, rate: 0.8 });
+                            }
+                            
+                            // Hide the power-up
+                            child.visible = false;
+                        }
+                    }
+                    // Bamboo collection
+                    else if (child.geometry && child.geometry.type === 'CylinderGeometry' && child.visible) {
+                        if (Math.abs(globalZ) < 1.5 && 
+                            Math.abs(child.position.x - character.position.x) < 1 &&
+                            Math.abs(child.position.y - character.position.y) < 1) {
+                            score += 10; // Bonus for collecting bamboo
+                            child.visible = false; // Hide the bamboo
+                            
+                            // Visual feedback for bamboo collection
+                            flashCharacter();
+                            
+                            // Play coin sound with spatial audio
+                            playSound('coin', { 
+                                volume: 0.5, 
+                                pan: child.position.x > character.position.x ? 0.3 : -0.3,
+                                rate: 0.9 + Math.random() * 0.2 // Slight random pitch variation
+                            });
+                        }
+                    }
+                    
+                    // Play water splash sound when near water
+                    if (child.userData && child.userData.terrainType === 'river') {
+                        if (Math.abs(globalZ) < 1 && 
+                            Math.abs(child.position.x - character.position.x) < 4 &&
+                            !isJumping && 
+                            Math.random() > 0.99 && 
+                            !splashSoundPlayed) {
+                            
+                            playSound('splash', { 
+                                volume: 0.3,
+                                pan: child.position.x > character.position.x ? 0.2 : -0.2
+                            });
+                            
+                            splashSoundPlayed = true;
+                            setTimeout(() => { splashSoundPlayed = false; }, 1000);
+                        }
+                    }
+                });
+            });
+
+            // Update score and display
+            score += speed * deltaTime; // Increment based on distance
+            document.getElementById('score').innerText = `Score: ${Math.floor(score)}`;
+            
+            // Check if we should change the panda's color (every 100 points)
+            const currentScoreHundreds = Math.floor(score / 100);
+            const lastScoreHundreds = Math.floor(lastColorChangeScore / 100);
+            
+            if (currentScoreHundreds > lastScoreHundreds) {
+                changePandaColor();
+                lastColorChangeScore = score;
+                
+                // Play a sound for color change
+                playSound('powerup');
+            }
+
+            // Update camera to follow character
+            camera.position.x = character.position.x * 0.8; // Slightly lag behind for better feel
+            if (!lowDetailMode) {
+                camera.position.y = 5 + character.position.y * 0.3; // Adjust height slightly with jumps
+            }
+            camera.lookAt(character.position.x, character.position.y, -10); // Look ahead along the path
+            
+            // Animate clouds in the sky
+            if (!lowDetailMode && sky) {
+                sky.children.forEach(child => {
+                    // Only animate cloud groups (they have userData with speed)
+                    if (child.userData && child.userData.speed) {
+                        // Move clouds slowly around the sky
+                        child.userData.angle += child.userData.speed * 0.01 * deltaTime;
+                        const radius = Math.sqrt(
+                            child.userData.initialX * child.userData.initialX + 
+                            child.userData.initialZ * child.userData.initialZ
+                        );
+                        
+                        child.position.x = Math.cos(child.userData.angle) * radius;
+                        child.position.z = Math.sin(child.userData.angle) * radius;
+                        
+                        // Slowly rotate the cloud for more dynamic feel
+                        child.rotation.y += 0.001 * deltaTime;
+                    }
+                });
+            }
+            
+            // Update time of day
+            updateTimeOfDay();
+            
+            // Animate rain if it's raining
+            if (isRaining && scene.userData.rainEffect) {
+                raindrops.forEach(raindrop => {
+                    // Move raindrop down
+                    raindrop.position.y -= raindrop.userData.velocity * deltaTime;
+                    
+                    // Add slight horizontal movement for wind effect
+                    raindrop.position.x += (Math.random() - 0.5) * 0.05 * deltaTime;
+                    raindrop.position.z += (Math.random() - 0.5) * 0.05 * deltaTime;
+                    
+                    // Reset position if below ground
+                    if (raindrop.position.y < -5) {
+                        raindrop.position.y = 10 + Math.random() * 20;
+                        raindrop.position.x = character.position.x + (Math.random() - 0.5) * 40;
+                        raindrop.position.z = character.position.z + (Math.random() - 0.5) * 40;
+                    }
+                });
+            }
+            
+            // Animate falling leaves
+            leaves.forEach(leaf => {
+                // Move leaf down
+                leaf.position.y -= leaf.userData.fallSpeed * deltaTime;
+                
+                // Add horizontal movement for wind effect
+                leaf.position.x += leaf.userData.horizontalSpeed.x * deltaTime;
+                leaf.position.z += leaf.userData.horizontalSpeed.z * deltaTime;
+                
+                // Rotate leaf
+                leaf.rotation.x += leaf.userData.rotationSpeed.x * deltaTime;
+                leaf.rotation.y += leaf.userData.rotationSpeed.y * deltaTime;
+                leaf.rotation.z += leaf.userData.rotationSpeed.z * deltaTime;
+                
+                // Reset position if below ground
+                if (leaf.position.y < -5) {
+                    leaf.position.y = 10 + Math.random() * 20;
+                    leaf.position.x = character.position.x + (Math.random() - 0.5) * 40;
+                    leaf.position.z = character.position.z + (Math.random() - 0.5) * 40;
+                }
+            });
+            
+            // Animate water surfaces
+            scene.traverse(object => {
+                if (object.userData && object.userData.animateWater) {
+                    object.userData.waveTime = (object.userData.waveTime || 0) + 0.01 * deltaTime;
+                    
+                    // Animate vertices for wave effect
+                    if (object.geometry && object.geometry.attributes && object.geometry.attributes.position) {
+                        const positions = object.geometry.attributes.position.array;
+                        const count = positions.length / 3;
+                        
+                        for (let i = 0; i < count; i++) {
+                            const x = positions[i * 3];
+                            const z = positions[i * 3 + 2];
+                            
+                            // Create wave pattern
+                            positions[i * 3 + 1] = Math.sin(x * 2 + object.userData.waveTime) * 0.03 + 
+                                                Math.cos(z * 2 + object.userData.waveTime * 0.8) * 0.03;
+                        }
+                        
+                        object.geometry.attributes.position.needsUpdate = true;
+                        object.geometry.computeVertexNormals();
+                    }
+                }
+            });
+        }
+
+        // Flash character when collecting a coin
+        function flashCharacter() {
+            // Store original colors
+            const originalColors = {};
+            
+            // Flash all parts yellow
+            character.traverse(child => {
+                if (child.isMesh) {
+                    originalColors[child.id] = child.material.color.clone();
+                    child.material.color.set(0xffff00); // Flash yellow
+                }
+            });
+            
+            // Reset to original colors after a short delay
+            setTimeout(() => {
+                character.traverse(child => {
+                    if (child.isMesh && originalColors[child.id]) {
+                        child.material.color.copy(originalColors[child.id]);
+                    }
+                });
+            }, 100);
+        }
+
+        // Game over function
+        function gameOver() {
+            gameRunning = false;
+            
+            // Stop ambient sounds (or reduce volume)
+            stopAmbientSounds();
+            
+            // Update final score display
+            document.getElementById('finalScore').innerText = `Your score: ${Math.floor(score)}`;
+            document.getElementById('gameOverScreen').style.display = 'block';
+            
+            // Play game over sound
+            playSound('gameover');
+            
+            // Check if the current score is higher than the high score
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('pendaHighScore', highScore);
+                document.getElementById('newHighScore').style.display = 'block';
+            }
+        }
+
+        // Start game function
+        function startGame() {
+            // Initialize audio if not already done
+            if (!audioContext) {
+                initAudioContext();
+            } else if (audioContext.state === 'suspended') {
+                // Resume audio context if it was suspended
+                audioContext.resume().then(() => {
+                    console.log('Audio context resumed in startGame');
+                });
+            }
+            
+            // Show sound notification if first time
+            if (!window.soundNotificationShown) {
+                const notification = document.createElement('div');
+                notification.textContent = 'Click anywhere for sound!';
+                notification.style.position = 'absolute';
+                notification.style.top = '20px';
+                notification.style.left = '50%';
+                notification.style.transform = 'translateX(-50%)';
+                notification.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                notification.style.color = 'white';
+                notification.style.padding = '10px 20px';
+                notification.style.borderRadius = '20px';
+                notification.style.fontFamily = 'Arial, sans-serif';
+                notification.style.zIndex = '1000';
+                document.body.appendChild(notification);
+                
+                // Remove after 5 seconds
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        document.body.removeChild(notification);
+                    }
+                }, 5000);
+                
+                window.soundNotificationShown = true;
+            }
+            
+            // Start ambient forest sounds
+            playAmbientSounds();
+            
+            // Reset game state
+            score = 0;
+            lane = 0;
+            speed = 0.2;
+            distanceTraveled = 0;
+            difficulty = 1;
+            isJumping = false;
+            jumpHeight = 0;
+            jumpVelocity = 0;
+            lastTime = 0;
+            lastColorChangeScore = 0;
+            currentColorIndex = 0;
+            
+            // Reset power-ups
+            hasShield = false;
+            shieldTime = 0;
+            hasSpeedBoost = false;
+            speedBoostTime = 0;
+            hasMagnet = false;
+            magnetTime = 0;
+            
+            // Hide shield mesh if it exists
+            if (shieldMesh) {
+                shieldMesh.visible = false;
+            }
+            
+            // Reset character position and appearance
+            character.position.set(0, 0, 0);
+            character.children.forEach(child => {
+                if (child.isMesh) {
+                    child.material.emissive.set(0x000000);
+                    
+                    // Reset white parts to default white color
+                    if (child.name === "body" || (!child.name && child.position.y > 1.0)) {
+                        child.material.color.setHex(pandaColors[0]); // Reset to white
+                    }
+                }
+            });
+            
+            // Reset trail - only in high detail mode
+            if (!lowDetailMode && trail.length > 0) {
+                trail.forEach(part => {
+                    part.visible = false;
+                });
+            }
+            
+            // Update high score display
+            document.getElementById('highScoreDisplay').innerText = `High Score: ${Math.floor(highScore)}`;
+            document.getElementById('newHighScore').style.display = 'none';
+            
+            // Hide UI elements
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('gameOverScreen').style.display = 'none';
+            
+            // Create fresh segments
+            createSegments();
+            
+            // Play start game sound
+            playSound('powerup', { volume: 0.7 });
+            
+            // Start the game
+            gameRunning = true;
+        }
+        
+        // Add a global click handler to initialize audio
+        document.addEventListener('click', function() {
+            if (!audioContext) {
+                initAudioContext();
+            } else if (audioContext.state === 'suspended') {
+                audioContext.resume().then(() => {
+                    console.log('Audio context resumed on click');
+                });
+            }
+        });
+
+        // Initialize the game
+        createSegments();
+        document.getElementById('highScoreDisplay').innerText = `High Score: ${Math.floor(highScore)}`;
+        createSoundControls(); // Add sound controls
+
+        // Event listeners for buttons
+        document.getElementById('startButton').addEventListener('click', function() {
+            // Initialize audio context on user interaction
+            initAudioContext();
+            startGame();
+        });
+        
+        document.getElementById('restartButton').addEventListener('click', function() {
+            // Initialize audio context on user interaction
+            initAudioContext();
+            startGame();
+        });
+
+        // Start the animation loop
+        animate();
+
+        // Function to change panda's color
+        function changePandaColor() {
+            // Move to the next color in the palette
+            currentColorIndex = (currentColorIndex + 1) % pandaColors.length;
+            const newColor = pandaColors[currentColorIndex];
+            
+            // Find all white parts of the panda (body and head)
+            character.traverse(child => {
+                if (child.isMesh && 
+                    child.material && 
+                    (child.name === "body" || 
+                     (!child.name && child.position.y > 1.0))) { // Head doesn't have a name but is positioned higher
+                    
+                    // Change the color
+                    child.material.color.setHex(newColor);
+                }
+            });
+            
+            // Show milestone notification
+            const milestone = document.getElementById('colorMilestone');
+            milestone.textContent = `Color Milestone: ${Math.floor(score)} points!`;
+            milestone.style.opacity = 1;
+            
+            // Color the milestone text to match the panda
+            milestone.style.color = '#' + newColor.toString(16).padStart(6, '0');
+            
+            // Hide the notification after 3 seconds
+            setTimeout(() => {
+                milestone.style.opacity = 0;
+            }, 3000);
+            
+            // Visual effect for color change
+            flashCharacter();
+            
+            // Play color change sound
+            playSound('colorChange', { volume: 0.6, rate: 1.0 + (currentColorIndex * 0.1) });
+        }
+
+        // Create power-ups
+        function createPowerUp(type) {
+            const powerUp = new THREE.Group();
+            
+            let color, emissiveColor;
+            
+            switch(type) {
+                case 'shield':
+                    color = 0x0088ff; // Blue
+                    emissiveColor = 0x0044aa;
+                    break;
+                case 'speedBoost':
+                    color = 0xff8800; // Orange
+                    emissiveColor = 0xaa4400;
+                    break;
+                case 'magnet':
+                    color = 0xff0088; // Pink
+                    emissiveColor = 0xaa0044;
+                    break;
+                default:
+                    color = 0xffffff;
+                    emissiveColor = 0x888888;
+            }
+            
+            // Create the power-up base (a leaf)
+            const leafShape = new THREE.Shape();
+            leafShape.moveTo(0, 0);
+            leafShape.bezierCurveTo(0.2, 0.2, 0.4, 0.2, 0.4, 0);
+            leafShape.bezierCurveTo(0.4, -0.2, 0.2, -0.4, 0, -0.4);
+            leafShape.bezierCurveTo(-0.2, -0.4, -0.4, -0.2, -0.4, 0);
+            leafShape.bezierCurveTo(-0.4, 0.2, -0.2, 0.2, 0, 0);
+            
+            const leafGeometry = new THREE.ShapeGeometry(leafShape);
+            const leafMaterial = new THREE.MeshStandardMaterial({ 
+                color: color,
+                metalness: 0.3,
+                roughness: 0.7,
+                emissive: emissiveColor,
+                emissiveIntensity: 0.5,
+                side: THREE.DoubleSide
+            });
+            
+            const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
+            leaf.scale.set(1.5, 1.5, 1.5);
+            leaf.rotation.x = Math.PI / 2;
+            powerUp.add(leaf);
+            
+            // Add an icon based on the power-up type
+            if (type === 'shield') {
+                // Add a shield icon (a small sphere)
+                const shield = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.2, 16, 16),
+                    new THREE.MeshStandardMaterial({ 
+                        color: 0x0088ff,
+                        metalness: 0.9,
+                        roughness: 0.1,
+                        transparent: true,
+                        opacity: 0.5
+                    })
+                );
+                shield.position.y = 0.2;
+                powerUp.add(shield);
+            } else if (type === 'speedBoost') {
+                // Add a speed boost icon (a small cone)
+                const boost = new THREE.Mesh(
+                    new THREE.ConeGeometry(0.15, 0.4, 16),
+                    new THREE.MeshStandardMaterial({ 
+                        color: 0xff8800,
+                        metalness: 0.7,
+                        roughness: 0.3
+                    })
+                );
+                boost.rotation.x = Math.PI;
+                boost.position.y = 0.2;
+                powerUp.add(boost);
+            } else if (type === 'magnet') {
+                // Add a magnet icon (a horseshoe)
+                const magnet = new THREE.Mesh(
+                    new THREE.TorusGeometry(0.15, 0.05, 16, 32, Math.PI),
+                    new THREE.MeshStandardMaterial({ 
+                        color: 0xff0088,
+                        metalness: 0.7,
+                        roughness: 0.3
+                    })
+                );
+                magnet.rotation.x = Math.PI / 2;
+                magnet.position.y = 0.2;
+                powerUp.add(magnet);
+            }
+            
+            // Set userData to identify as power-up
+            powerUp.userData.isPowerUp = true;
+            powerUp.userData.type = type;
+            
+            return powerUp;
+        }
+
+        // Create a tree with improved materials and shadows
+        function createTree(size) {
+            const tree = new THREE.Group();
+            
+            // Create trunk with better material
+            const trunkGeometry = new THREE.CylinderGeometry(size * 0.1, size * 0.15, size * 1.5, 8);
+            const trunkMaterial = new THREE.MeshStandardMaterial({
+                color: 0x8B4513,
+                roughness: 0.9,
+                metalness: 0.1,
+                flatShading: true
+            });
+            const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+            trunk.position.y = size * 0.75;
+            trunk.castShadow = true;
+            trunk.receiveShadow = true;
+            
+            // Add bark texture by distorting the trunk geometry
+            const trunkVertices = trunk.geometry.attributes.position.array;
+            for (let i = 0; i < trunkVertices.length; i += 3) {
+                const noise = (Math.random() - 0.5) * 0.05 * size;
+                trunkVertices[i] += noise;
+                trunkVertices[i + 2] += noise;
+            }
+            trunk.geometry.attributes.position.needsUpdate = true;
+            trunk.geometry.computeVertexNormals();
+            
+            tree.add(trunk);
+            
+            // Create foliage with better materials
+            const foliageMaterial = new THREE.MeshStandardMaterial({
+                color: 0x2E7D32,
+                roughness: 0.8,
+                metalness: 0.0,
+                flatShading: true
+            });
+            
+            // Multiple layers of foliage
+            const foliageLayers = 3;
+            for (let i = 0; i < foliageLayers; i++) {
+                const layerSize = size * (1.2 - i * 0.15);
+                const layerHeight = size * (1.5 + i * 0.4);
+                
+                // Use cone geometry for more realistic tree shape
+                const foliageGeometry = new THREE.ConeGeometry(layerSize, layerSize * 1.2, 8);
+                const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial.clone());
+                
+                // Randomize foliage color slightly for variety
+                foliage.material.color.setHSL(
+                    0.3, // Base green hue
+                    0.6 + Math.random() * 0.2, // Saturation
+                    0.3 + Math.random() * 0.15 // Lightness
+                );
+                
+                foliage.position.y = layerHeight;
+                foliage.castShadow = true;
+                foliage.receiveShadow = true;
+                
+                // Add some variation to the foliage shape
+                const foliageVertices = foliage.geometry.attributes.position.array;
+                for (let j = 0; j < foliageVertices.length; j += 3) {
+                    const noise = (Math.random() - 0.5) * 0.1 * size;
+                    foliageVertices[j] += noise;
+                    foliageVertices[j + 2] += noise;
+                }
+                foliage.geometry.attributes.position.needsUpdate = true;
+                foliage.geometry.computeVertexNormals();
+                
+                tree.add(foliage);
+            }
+            
+            return tree;
+        }
+        
+        // Create a rock with improved materials and shadows
+        function createRock(size) {
+            // Use dodecahedron for more interesting rock shape
+            const rockGeometry = new THREE.DodecahedronGeometry(size, 1);
+            const rockMaterial = new THREE.MeshStandardMaterial({
+                color: 0x808080,
+                roughness: 0.9,
+                metalness: 0.2,
+                flatShading: true
+            });
+            
+            // Randomize rock color slightly
+            rockMaterial.color.setHSL(
+                0.1, // Base grey-brown hue
+                0.1 + Math.random() * 0.1, // Low saturation
+                0.3 + Math.random() * 0.2 // Varied lightness
+            );
+            
+            const rock = new THREE.Mesh(rockGeometry, rockMaterial);
+            
+            // Distort vertices for more natural look
+            const vertices = rock.geometry.attributes.position.array;
+            for (let i = 0; i < vertices.length; i += 3) {
+                vertices[i] += (Math.random() - 0.5) * 0.2 * size;
+                vertices[i + 1] += (Math.random() - 0.5) * 0.2 * size;
+                vertices[i + 2] += (Math.random() - 0.5) * 0.2 * size;
+            }
+            rock.geometry.attributes.position.needsUpdate = true;
+            rock.geometry.computeVertexNormals();
+            
+            // Add shadow properties
+            rock.castShadow = true;
+            rock.receiveShadow = true;
+            
+            return rock;
+        }
+        
+        // Create a bush with improved materials and shadows
+        function createBush(size) {
+            const bush = new THREE.Group();
+            
+            // Create multiple spheres for the bush
+            const bushMaterial = new THREE.MeshStandardMaterial({
+                color: 0x2E7D32,
+                roughness: 0.9,
+                metalness: 0.0
+            });
+            
+            // Randomize bush color slightly
+            bushMaterial.color.setHSL(
+                0.25 + Math.random() * 0.1, // Varied green hue
+                0.6 + Math.random() * 0.2, // Saturation
+                0.3 + Math.random() * 0.1 // Lightness
+            );
+            
+            const sphereCount = 3 + Math.floor(Math.random() * 3);
+            
+            // Create main sphere
+            const mainSphere = new THREE.Mesh(
+                new THREE.SphereGeometry(size, 8, 6),
+                bushMaterial.clone()
+            );
+            mainSphere.position.y = size;
+            mainSphere.castShadow = true;
+            mainSphere.receiveShadow = true;
+            bush.add(mainSphere);
+            
+            // Add additional spheres
+            for (let i = 0; i < sphereCount; i++) {
+                const sphereSize = size * (0.6 + Math.random() * 0.4);
+                const sphere = new THREE.Mesh(
+                    new THREE.SphereGeometry(sphereSize, 8, 6),
+                    bushMaterial.clone()
+                );
+                
+                // Randomize position around main sphere
+                const angle = Math.random() * Math.PI * 2;
+                const radius = size * 0.6;
+                sphere.position.x = Math.cos(angle) * radius;
+                sphere.position.z = Math.sin(angle) * radius;
+                sphere.position.y = size * (0.7 + Math.random() * 0.6);
+                
+                // Randomize color slightly
+                sphere.material.color.setHSL(
+                    0.25 + Math.random() * 0.1, // Varied green hue
+                    0.6 + Math.random() * 0.2, // Saturation
+                    0.3 + Math.random() * 0.1 // Lightness
+                );
+                
+                sphere.castShadow = true;
+                sphere.receiveShadow = true;
+                bush.add(sphere);
+            }
+            
+            return bush;
+        }
+        
+        // Create flowers with improved materials and shadows
+        function createFlowers(size) {
+            const flowerGroup = new THREE.Group();
+            
+            // Create multiple flowers
+            const flowerCount = 3 + Math.floor(Math.random() * 4);
+            
+            for (let i = 0; i < flowerCount; i++) {
+                const flower = new THREE.Group();
+                
+                // Create stem
+                const stemGeometry = new THREE.CylinderGeometry(size * 0.02, size * 0.02, size * 0.5, 5);
+                const stemMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x33691E,
+                    roughness: 0.8,
+                    metalness: 0.0
+                });
+                const stem = new THREE.Mesh(stemGeometry, stemMaterial);
+                stem.position.y = size * 0.25;
+                stem.castShadow = true;
+                stem.receiveShadow = true;
+                
+                // Add slight curve to stem
+                stem.rotation.x = (Math.random() - 0.5) * 0.2;
+                stem.rotation.z = (Math.random() - 0.5) * 0.2;
+                
+                flower.add(stem);
+                
+                // Create flower head
+                // Choose random flower color
+                const flowerColors = [
+                    0xFF5252, // Red
+                    0xFFEB3B, // Yellow
+                    0xE040FB, // Purple
+                    0xFFFFFF, // White
+                    0xFF9800  // Orange
+                ];
+                const flowerColor = flowerColors[Math.floor(Math.random() * flowerColors.length)];
+                
+                // Create petals
+                const petalCount = 5 + Math.floor(Math.random() * 3);
+                const petalMaterial = new THREE.MeshStandardMaterial({
+                    color: flowerColor,
+                    roughness: 0.7,
+                    metalness: 0.0,
+                    side: THREE.DoubleSide
+                });
+                
+                for (let j = 0; j < petalCount; j++) {
+                    const petalGeometry = new THREE.PlaneGeometry(size * 0.15, size * 0.3);
+                    const petal = new THREE.Mesh(petalGeometry, petalMaterial.clone());
+                    
+                    // Position petals in a circle
+                    const angle = (j / petalCount) * Math.PI * 2;
+                    petal.position.y = size * 0.5;
+                    petal.rotation.x = Math.PI / 2;
+                    petal.rotation.z = angle;
+                    
+                    // Tilt petals outward
+                    petal.rotation.y = Math.PI / 6;
+                    
+                    petal.castShadow = true;
+                    petal.receiveShadow = true;
+                    flower.add(petal);
+                }
+                
+                // Create center of flower
+                const centerGeometry = new THREE.SphereGeometry(size * 0.08, 8, 6);
+                const centerMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xFFC107, // Yellow center
+                    roughness: 0.8,
+                    metalness: 0.1
+                });
+                const center = new THREE.Mesh(centerGeometry, centerMaterial);
+                center.position.y = size * 0.5;
+                center.castShadow = true;
+                center.receiveShadow = true;
+                flower.add(center);
+                
+                // Position flower in group
+                const angle = Math.random() * Math.PI * 2;
+                const radius = size * 0.5;
+                flower.position.x = Math.cos(angle) * radius;
+                flower.position.z = Math.sin(angle) * radius;
+                
+                flowerGroup.add(flower);
+            }
+            
+            return flowerGroup;
+        }
+        
+        // Create waterfall with improved materials and shadows
+        function createWaterfall(size) {
+            const waterfall = new THREE.Group();
+            waterfall.userData.animateWaterfall = true;
+            
+            // Create water stream
+            const streamGeometry = new THREE.BoxGeometry(size * 1.5, size * 3, size * 0.2);
+            const streamMaterial = new THREE.MeshStandardMaterial({
+                color: 0x4FC3F7,
+                transparent: true,
+                opacity: 0.7,
+                metalness: 0.3,
+                roughness: 0.2
+            });
+            const stream = new THREE.Mesh(streamGeometry, streamMaterial);
+            stream.position.y = size * 1.5;
+            stream.castShadow = true;
+            stream.receiveShadow = true;
+            waterfall.add(stream);
+            
+            // Create rocks around waterfall
+            const rockCount = 5 + Math.floor(Math.random() * 4);
+            for (let i = 0; i < rockCount; i++) {
+                const rockSize = size * (0.2 + Math.random() * 0.3);
+                const rock = createRock(rockSize);
+                
+                // Position rocks around the base and sides of waterfall
+                const angle = Math.random() * Math.PI * 2;
+                const radius = size * (0.8 + Math.random() * 0.5);
+                rock.position.x = Math.cos(angle) * radius;
+                rock.position.z = Math.sin(angle) * radius;
+                rock.position.y = rockSize * 0.5;
+                
+                waterfall.add(rock);
+            }
+            
+            // Create splash effect at bottom
+            const splashGeometry = new THREE.CircleGeometry(size, 16);
+            const splashMaterial = new THREE.MeshStandardMaterial({
+                color: 0x4FC3F7,
+                transparent: true,
+                opacity: 0.6,
+                metalness: 0.1,
+                roughness: 0.3,
+                side: THREE.DoubleSide
+            });
+            const splash = new THREE.Mesh(splashGeometry, splashMaterial);
+            splash.rotation.x = -Math.PI / 2;
+            splash.position.y = 0.05;
+            splash.receiveShadow = true;
+            waterfall.add(splash);
+            
+            return waterfall;
+        }
+
+        // Create a dynamic sky
+        function createSky() {
+            const sky = new THREE.Group();
+            
+            // Sky dome
+            const skyGeometry = new THREE.SphereGeometry(100, 32, 32);
+            const skyMaterial = new THREE.MeshBasicMaterial({
+                color: 0x87CEEB, // Sky blue
+                side: THREE.BackSide // Render on the inside
+            });
+            const skyDome = new THREE.Mesh(skyGeometry, skyMaterial);
+            sky.add(skyDome);
+            
+            // Add clouds if not in low detail mode
+            if (!lowDetailMode) {
+                const cloudCount = 20;
+                const cloudMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xFFFFFF,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                for (let i = 0; i < cloudCount; i++) {
+                    const cloudGroup = new THREE.Group();
+                    
+                    // Create cloud with multiple spheres
+                    const puffCount = 3 + Math.floor(Math.random() * 4);
+                    for (let j = 0; j < puffCount; j++) {
+                        const size = 2 + Math.random() * 3;
+                        const puff = new THREE.Mesh(
+                            new THREE.SphereGeometry(size, 8, 8),
+                            cloudMaterial.clone()
+                        );
+                        
+                        // Position puffs to form a cloud
+                        puff.position.x = (j - puffCount/2) * 2 + Math.random() * 2;
+                        puff.position.y = Math.random() * 2;
+                        puff.position.z = Math.random() * 2 - 1;
+                        
+                        cloudGroup.add(puff);
+                    }
+                    
+                    // Position cloud in the sky
+                    const angle = (i / cloudCount) * Math.PI * 2;
+                    const radius = 80 + Math.random() * 10;
+                    const height = 30 + Math.random() * 40;
+                    
+                    cloudGroup.position.x = Math.cos(angle) * radius;
+                    cloudGroup.position.y = height;
+                    cloudGroup.position.z = Math.sin(angle) * radius;
+                    
+                    // Add random rotation
+                    cloudGroup.rotation.y = Math.random() * Math.PI * 2;
+                    
+                    // Store initial position for animation
+                    cloudGroup.userData = {
+                        initialX: cloudGroup.position.x,
+                        initialZ: cloudGroup.position.z,
+                        speed: 0.01 + Math.random() * 0.02,
+                        angle: angle
+                    };
+                    
+                    sky.add(cloudGroup);
+                }
+            }
+            
+            // Add sun
+            const sunGeometry = new THREE.SphereGeometry(5, 16, 16);
+            const sunMaterial = new THREE.MeshBasicMaterial({
+                color: 0xFFFF99,
+                emissive: 0xFFFF00,
+                emissiveIntensity: 1
+            });
+            const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+            sun.position.set(60, 50, -60);
+            sky.add(sun);
+            
+            // Add a subtle lens flare effect for the sun
+            if (!lowDetailMode) {
+                const flareGeometry = new THREE.PlaneGeometry(10, 10);
+                const flareMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xFFFFAA,
+                    transparent: true,
+                    opacity: 0.4,
+                    side: THREE.DoubleSide
+                });
+                const flare = new THREE.Mesh(flareGeometry, flareMaterial);
+                flare.position.copy(sun.position);
+                flare.lookAt(0, 0, 0);
+                sky.add(flare);
+            }
+            
+            return sky;
+        }
+        
+        // Add sky to the scene
+        const sky = createSky();
+        scene.add(sky);
+
+        // Background sound sources
+        let birdsSoundSource = null;
+        let riverSoundSource = null;
+        let windSoundSource = null;
+        
+        // Play ambient forest sounds
+        function playAmbientSounds() {
+            if (!audioContext || !musicEnabled) return;
+            
+            // Play birds chirping sound (looped)
+            if (sounds['birds'] && !birdsSoundSource) {
+                birdsSoundSource = audioContext.createBufferSource();
+                birdsSoundSource.buffer = sounds['birds'];
+                birdsSoundSource.loop = true;
+                
+                // Create gain node to control volume
+                birdsGainNode = audioContext.createGain();
+                birdsGainNode.gain.value = 0.2 * masterVolume; // Lower volume
+                
+                birdsSoundSource.connect(birdsGainNode);
+                birdsGainNode.connect(audioContext.destination);
+                birdsSoundSource.start(0);
+            }
+            
+            // Play river sound (looped)
+            if (sounds['river'] && !riverSoundSource) {
+                riverSoundSource = audioContext.createBufferSource();
+                riverSoundSource.buffer = sounds['river'];
+                riverSoundSource.loop = true;
+                
+                // Create gain node to control volume
+                riverGainNode = audioContext.createGain();
+                riverGainNode.gain.value = 0.3 * masterVolume; // Lower volume
+                
+                riverSoundSource.connect(riverGainNode);
+                riverGainNode.connect(audioContext.destination);
+                riverSoundSource.start(0);
+            }
+            
+            // Play wind sound (looped)
+            if (sounds['wind'] && !windSoundSource) {
+                windSoundSource = audioContext.createBufferSource();
+                windSoundSource.buffer = sounds['wind'];
+                windSoundSource.loop = true;
+                
+                // Create gain node to control volume
+                windGainNode = audioContext.createGain();
+                windGainNode.gain.value = 0.1 * masterVolume; // Lower volume
+                
+                windSoundSource.connect(windGainNode);
+                windGainNode.connect(audioContext.destination);
+                windSoundSource.start(0);
+            }
+        }
+        
+        // Stop ambient sounds
+        function stopAmbientSounds() {
+            if (birdsSoundSource) {
+                birdsSoundSource.stop();
+                birdsSoundSource = null;
+            }
+            
+            if (riverSoundSource) {
+                riverSoundSource.stop();
+                riverSoundSource = null;
+            }
+            
+            if (windSoundSource) {
+                windSoundSource.stop();
+                windSoundSource = null;
+            }
+        }
+
+        // Add sound control panel
+        function createSoundControls() {
+            const soundPanel = document.createElement('div');
+            soundPanel.id = 'soundPanel';
+            soundPanel.style.position = 'absolute';
+            soundPanel.style.top = '10px';
+            soundPanel.style.right = '10px';
+            soundPanel.style.backgroundColor = 'rgba(0,0,0,0.5)';
+            soundPanel.style.padding = '10px';
+            soundPanel.style.borderRadius = '5px';
+            soundPanel.style.color = 'white';
+            soundPanel.style.fontFamily = 'Arial, sans-serif';
+            soundPanel.style.zIndex = '1000';
+            
+            // Main sound toggle
+            const soundToggle = document.createElement('div');
+            soundToggle.innerHTML = '<label><input type="checkbox" id="soundToggle" checked> Sound Effects</label>';
+            soundPanel.appendChild(soundToggle);
+            
+            // Music toggle
+            const musicToggle = document.createElement('div');
+            musicToggle.innerHTML = '<label><input type="checkbox" id="musicToggle" checked> Ambient Sounds</label>';
+            soundPanel.appendChild(musicToggle);
+            
+            // Volume slider
+            const volumeControl = document.createElement('div');
+            volumeControl.style.marginTop = '10px';
+            volumeControl.innerHTML = 'Volume: <input type="range" id="volumeSlider" min="0" max="100" value="70" style="width: 100px">';
+            soundPanel.appendChild(volumeControl);
+            
+            document.body.appendChild(soundPanel);
+            
+            // Event listeners
+            document.getElementById('soundToggle').addEventListener('change', function(e) {
+                soundEnabled = e.target.checked;
+                if (!soundEnabled) {
+                    // Mute all sound effects but keep ambient sounds
+                    soundVolume = 0;
+                } else {
+                    // Restore sound effects volume
+                    soundVolume = document.getElementById('volumeSlider').value / 100;
+                }
+            });
+            
+            document.getElementById('musicToggle').addEventListener('change', function(e) {
+                musicEnabled = e.target.checked;
+                if (musicEnabled) {
+                    if (gameRunning) {
+                        playAmbientSounds();
+                    }
+                } else {
+                    stopAmbientSounds();
+                }
+            });
+            
+            document.getElementById('volumeSlider').addEventListener('input', function(e) {
+                const value = e.target.value / 100;
+                masterVolume = value;
+                
+                // Update ambient sound volumes if they exist
+                if (birdsSoundSource && birdsGainNode) {
+                    birdsGainNode.gain.value = 0.2 * masterVolume;
+                }
+                if (riverSoundSource && riverGainNode) {
+                    riverGainNode.gain.value = 0.3 * masterVolume;
+                }
+                if (windSoundSource && windGainNode) {
+                    windGainNode.gain.value = 0.1 * masterVolume;
+                }
+                
+                // Only update sound effects volume if sound is enabled
+                if (soundEnabled) {
+                    soundVolume = value;
+                }
+            });
+        }
+        
+        // Sound state variables
+        let soundEnabled = true;
+        let musicEnabled = true;
+        let masterVolume = 0.7; // Default volume
+        let soundVolume = 0.7;  // Sound effects volume
+        let footstepPlayed = false;
+        let splashSoundPlayed = false;
+        
+        // Gain nodes for ambient sounds
+        let birdsGainNode = null;
+        let riverGainNode = null;
+        let windGainNode = null;
+        
+        // Weather and environment effects
+        let isRaining = false;
+        let rainIntensity = 0;
+        let isDaytime = true;
+        let timeOfDay = 0.5; // 0 = dawn, 0.5 = midday, 1 = dusk
+        let raindrops = [];
+        let leaves = [];
+        
+        // Create realistic terrain with heightmap
+        function createTerrainWithHeightmap(width, depth, segments, heightScale) {
+            const geometry = new THREE.PlaneGeometry(width, depth, segments, segments);
+            
+            // Generate heightmap
+            const vertices = geometry.attributes.position.array;
+            for (let i = 0; i < vertices.length; i += 3) {
+                // Skip the edges to keep them flat (for gameplay purposes)
+                const x = vertices[i];
+                const z = vertices[i + 2];
+                
+                // Only modify height if not at the edges
+                if (Math.abs(x) < width/2 - 1 && Math.abs(z) < depth/2 - 1) {
+                    // Use simplex noise for natural-looking terrain
+                    const noise = (Math.sin(x * 0.5) * Math.cos(z * 0.5) * 0.5 + 0.5) * 
+                                 (Math.sin(x * 0.2 + z * 0.3) * 0.3 + 0.7);
+                    vertices[i + 1] = noise * heightScale;
+                }
+            }
+            
+            // Update normals for proper lighting
+            geometry.computeVertexNormals();
+            
+            return geometry;
+        }
+        
+        // Create realistic water surface
+        function createWaterSurface(width, depth) {
+            const geometry = new THREE.PlaneGeometry(width, depth, 20, 20);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x4FC3F7,
+                transparent: true,
+                opacity: 0.8,
+                metalness: 0.1,
+                roughness: 0.2,
+                side: THREE.DoubleSide
+            });
+            
+            const water = new THREE.Mesh(geometry, material);
+            
+            // Add subtle waves animation
+            water.userData.animateWater = true;
+            water.userData.waveTime = Math.random() * Math.PI * 2;
+            
+            return water;
+        }
+        
+        // Create realistic forest floor with details
+        function createDetailedForestFloor(width, depth, type) {
+            const group = new THREE.Group();
+            
+            // Base terrain with heightmap
+            const heightScale = type === 'river' ? 0.05 : 0.2;
+            const terrainGeometry = createTerrainWithHeightmap(width, depth, 15, heightScale);
+            
+            let terrainMaterial;
+            
+            if (type === 'grass') {
+                // Grass material with texture
+                terrainMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x4CAF50,
+                    roughness: 0.9,
+                    metalness: 0.0
+                });
+                
+                // Add grass tufts if not in low detail mode
+                if (!lowDetailMode) {
+                    const grassCount = 30;
+                    for (let i = 0; i < grassCount; i++) {
+                        const x = (Math.random() - 0.5) * width * 0.9;
+                        const z = (Math.random() - 0.5) * depth * 0.9;
+                        
+                        // Create grass tuft
+                        const grassTuft = new THREE.Group();
+                        const bladeCount = 3 + Math.floor(Math.random() * 3);
+                        
+                        for (let j = 0; j < bladeCount; j++) {
+                            const height = 0.1 + Math.random() * 0.2;
+                            const width = 0.02 + Math.random() * 0.02;
+                            
+                            const blade = new THREE.Mesh(
+                                new THREE.PlaneGeometry(width, height),
+                                new THREE.MeshStandardMaterial({
+                                    color: 0x4CAF50,
+                                    side: THREE.DoubleSide,
+                                    transparent: true
+                                })
+                            );
+                            
+                            // Position and rotate blade
+                            blade.position.y = height / 2;
+                            blade.rotation.y = Math.random() * Math.PI;
+                            blade.rotation.x = Math.random() * 0.2 - 0.1;
+                            
+                            grassTuft.add(blade);
+                        }
+                        
+                        grassTuft.position.set(x, 0, z);
+                        group.add(grassTuft);
+                    }
+                }
+            } else if (type === 'river') {
+                // River bed material
+                terrainMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x795548,
+                    roughness: 0.8,
+                    metalness: 0.1
+                });
+                
+                // Add water surface
+                const water = createWaterSurface(width * 0.9, depth * 0.9);
+                water.rotation.x = -Math.PI / 2;
+                water.position.y = 0.05;
+                group.add(water);
+                
+                // Add small pebbles on riverbed
+                if (!lowDetailMode) {
+                    const pebbleCount = 20;
+                    for (let i = 0; i < pebbleCount; i++) {
+                        const size = 0.05 + Math.random() * 0.1;
+                        const pebble = new THREE.Mesh(
+                            new THREE.SphereGeometry(size, 6, 6),
+                            new THREE.MeshStandardMaterial({
+                                color: 0xA1887F,
+                                roughness: 0.9
+                            })
+                        );
+                        
+                        const x = (Math.random() - 0.5) * width * 0.8;
+                        const z = (Math.random() - 0.5) * depth * 0.8;
+                        pebble.position.set(x, -0.05 + size * 0.8, z);
+                        
+                        group.add(pebble);
+                    }
+                }
+            } else { // land
+                // Dirt/soil material
+                terrainMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x8D6E63,
+                    roughness: 0.9,
+                    metalness: 0.0
+                });
+                
+                // Add small rocks and sticks
+                if (!lowDetailMode) {
+                    // Add rocks
+                    const rockCount = 15;
+                    for (let i = 0; i < rockCount; i++) {
+                        const size = 0.05 + Math.random() * 0.1;
+                        const rock = new THREE.Mesh(
+                            new THREE.DodecahedronGeometry(size, 0),
+                            new THREE.MeshStandardMaterial({
+                                color: 0x9E9E9E,
+                                roughness: 0.9
+                            })
+                        );
+                        
+                        // Randomize vertices slightly for more natural look
+                        const vertices = rock.geometry.attributes.position.array;
+                        for (let j = 0; j < vertices.length; j += 3) {
+                            vertices[j] += (Math.random() - 0.5) * 0.1;
+                            vertices[j + 1] += (Math.random() - 0.5) * 0.1;
+                            vertices[j + 2] += (Math.random() - 0.5) * 0.1;
+                        }
+                        rock.geometry.computeVertexNormals();
+                        
+                        const x = (Math.random() - 0.5) * width * 0.8;
+                        const z = (Math.random() - 0.5) * depth * 0.8;
+                        rock.position.set(x, 0.02, z);
+                        rock.rotation.set(
+                            Math.random() * Math.PI,
+                            Math.random() * Math.PI,
+                            Math.random() * Math.PI
+                        );
+                        
+                        group.add(rock);
+                    }
+                    
+                    // Add sticks
+                    const stickCount = 10;
+                    for (let i = 0; i < stickCount; i++) {
+                        const length = 0.2 + Math.random() * 0.3;
+                        const thickness = 0.01 + Math.random() * 0.02;
+                        
+                        const stick = new THREE.Mesh(
+                            new THREE.CylinderGeometry(thickness, thickness, length, 5, 1),
+                            new THREE.MeshStandardMaterial({
+                                color: 0x5D4037,
+                                roughness: 0.9
+                            })
+                        );
+                        
+                        stick.rotation.x = Math.PI / 2;
+                        stick.rotation.z = Math.random() * Math.PI;
+                        
+                        const x = (Math.random() - 0.5) * width * 0.8;
+                        const z = (Math.random() - 0.5) * depth * 0.8;
+                        stick.position.set(x, 0.02, z);
+                        
+                        group.add(stick);
+                    }
+                }
+            }
+            
+            // Create terrain mesh
+            const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
+            terrain.rotation.x = -Math.PI / 2;
+            terrain.receiveShadow = !lowDetailMode;
+            
+            // Store terrain type for collision detection
+            terrain.userData.terrainType = type;
+            
+            group.add(terrain);
+            return group;
+        }
+        
+        // Create rain effect
+        function createRainEffect() {
+            const rainGroup = new THREE.Group();
+            
+            // Create raindrops
+            const raindropCount = lowDetailMode ? 100 : 500;
+            const raindropMaterial = new THREE.MeshBasicMaterial({
+                color: 0xCCEEFF,
+                transparent: true,
+                opacity: 0.6
+            });
+            
+            for (let i = 0; i < raindropCount; i++) {
+                const length = 0.1 + Math.random() * 0.2;
+                const raindrop = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.01, 0.01, length, 3, 1),
+                    raindropMaterial
+                );
+                
+                // Position randomly in a large volume around the player
+                raindrop.position.set(
+                    (Math.random() - 0.5) * 40,
+                    10 + Math.random() * 20,
+                    (Math.random() - 0.5) * 40
+                );
+                
+                // Tilt slightly
+                raindrop.rotation.x = Math.PI / 8;
+                
+                // Store velocity for animation
+                raindrop.userData = {
+                    velocity: 0.2 + Math.random() * 0.1,
+                    rotationSpeed: Math.random() * 0.01
+                };
+                
+                raindrops.push(raindrop);
+                rainGroup.add(raindrop);
+            }
+            
+            return rainGroup;
+        }
+        
+        // Create falling leaves effect
+        function createFallingLeaves() {
+            const leavesGroup = new THREE.Group();
+            
+            // Create leaves
+            const leafCount = lowDetailMode ? 20 : 100;
+            
+            for (let i = 0; i < leafCount; i++) {
+                const size = 0.05 + Math.random() * 0.1;
+                
+                // Random leaf color (autumn colors)
+                const colors = [0xFFA726, 0xFFB74D, 0xFFCC80, 0xE65100, 0xF57F17, 0x689F38];
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                
+                const leafMaterial = new THREE.MeshStandardMaterial({
+                    color: color,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                
+                // Create leaf shape
+                const leaf = new THREE.Mesh(
+                    new THREE.PlaneGeometry(size, size * 1.5),
+                    leafMaterial
+                );
+                
+                // Position randomly in a large volume around the player
+                leaf.position.set(
+                    (Math.random() - 0.5) * 40,
+                    10 + Math.random() * 20,
+                    (Math.random() - 0.5) * 40
+                );
+                
+                // Random rotation
+                leaf.rotation.set(
+                    Math.random() * Math.PI * 2,
+                    Math.random() * Math.PI * 2,
+                    Math.random() * Math.PI * 2
+                );
+                
+                // Store properties for animation
+                leaf.userData = {
+                    fallSpeed: 0.02 + Math.random() * 0.03,
+                    rotationSpeed: {
+                        x: (Math.random() - 0.5) * 0.02,
+                        y: (Math.random() - 0.5) * 0.02,
+                        z: (Math.random() - 0.5) * 0.02
+                    },
+                    horizontalSpeed: {
+                        x: (Math.random() - 0.5) * 0.02,
+                        z: (Math.random() - 0.5) * 0.02
+                    }
+                };
+                
+                leaves.push(leaf);
+                leavesGroup.add(leaf);
+            }
+            
+            return leavesGroup;
+        }
+        
+        // Update time of day lighting
+        function updateTimeOfDay() {
+            // Cycle through time of day
+            timeOfDay += 0.0001;
+            if (timeOfDay > 1) timeOfDay = 0;
+            
+            // Determine if it's daytime (0.25 to 0.75 is day)
+            isDaytime = timeOfDay > 0.25 && timeOfDay < 0.75;
+            
+            // Update sky color with smoother transitions
+            if (sky && sky.children.length > 0) {
+                const skyDome = sky.children[0];
+                if (skyDome.material) {
+                    // Dawn colors (0.2 to 0.3)
+                    if (timeOfDay >= 0.2 && timeOfDay < 0.3) {
+                        const t = (timeOfDay - 0.2) / 0.1; // 0 to 1 during dawn
+                        skyDome.material.color.setRGB(
+                            0.8 + t * 0.1,  // Increase red during dawn
+                            0.6 + t * 0.3,  // Increase green during dawn
+                            0.8 + t * 0.2   // Increase blue during dawn
+                        );
+                    }
+                    // Day colors (0.3 to 0.7)
+                    else if (timeOfDay >= 0.3 && timeOfDay < 0.7) {
+                        skyDome.material.color.setHex(0x87CEEB); // Sky blue
+                    }
+                    // Dusk colors (0.7 to 0.8)
+                    else if (timeOfDay >= 0.7 && timeOfDay < 0.8) {
+                        const t = (timeOfDay - 0.7) / 0.1; // 0 to 1 during dusk
+                        skyDome.material.color.setRGB(
+                            0.9 - t * 0.3,  // Decrease red during dusk
+                            0.7 - t * 0.5,  // Decrease green during dusk
+                            0.9 - t * 0.7   // Decrease blue during dusk
+                        );
+                    }
+                    // Night colors (0.8 to 0.2)
+                    else {
+                        skyDome.material.color.setHex(0x0A1020); // Dark blue night sky
+                        
+                        // Add stars at night if they don't exist
+                        if (!sky.userData.starsAdded && !lowDetailMode) {
+                            const starsGeometry = new THREE.BufferGeometry();
+                            const starsMaterial = new THREE.PointsMaterial({
+                                color: 0xFFFFFF,
+                                size: 0.2,
+                                transparent: true,
+                                opacity: 0.8,
+                                sizeAttenuation: false
+                            });
+                            
+                            const starsVertices = [];
+                            for (let i = 0; i < 1000; i++) {
+                                const theta = Math.random() * Math.PI * 2;
+                                const phi = Math.acos(Math.random() * 2 - 1);
+                                const radius = 90;
+                                
+                                const x = radius * Math.sin(phi) * Math.cos(theta);
+                                const y = radius * Math.sin(phi) * Math.sin(theta);
+                                const z = radius * Math.cos(phi);
+                                
+                                starsVertices.push(x, y, z);
+                            }
+                            
+                            starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starsVertices, 3));
+                            const stars = new THREE.Points(starsGeometry, starsMaterial);
+                            sky.add(stars);
+                            sky.userData.stars = stars;
+                            sky.userData.starsAdded = true;
+                        }
+                        
+                        // Show stars at night
+                        if (sky.userData.stars) {
+                            sky.userData.stars.visible = true;
+                        }
+                    }
+                    
+                    // Hide stars during day
+                    if (isDaytime && sky.userData.stars) {
+                        sky.userData.stars.visible = false;
+                    }
+                }
+            }
+            
+            // Update sun position and color with improved transitions
+            if (sky) {
+                sky.children.forEach(child => {
+                    // Find the sun
+                    if (child.geometry && child.geometry.type === 'SphereGeometry' && 
+                        child.material && child.material.color.getHex() !== 0x0A1020) {
+                        
+                        // Calculate sun position based on time of day
+                        const angle = (timeOfDay * Math.PI * 2) - Math.PI/2;
+                        const radius = 80;
+                        const height = Math.sin(angle) * 50;
+                        
+                        child.position.x = Math.cos(angle) * radius;
+                        child.position.y = height;
+                        child.position.z = -60;
+                        
+                        // Update sun color based on height
+                        if (height < 0) {
+                            // Sun is below horizon
+                            child.visible = false;
+                        } else {
+                            child.visible = true;
+                            
+                            // Redder at horizon, whiter at zenith
+                            const normalizedHeight = Math.min(1, height / 30);
+                            
+                            // Dawn/dusk: more orange/red
+                            if (timeOfDay < 0.3 || timeOfDay > 0.7) {
+                                child.material.color.setRGB(
+                                    1,
+                                    0.6 + normalizedHeight * 0.2,
+                                    0.3 + normalizedHeight * 0.4
+                                );
+                                // Make sun larger at dawn/dusk for visual effect
+                                child.scale.set(1.2, 1.2, 1.2);
+                            } 
+                            // Midday: more yellow/white
+                            else {
+                                child.material.color.setRGB(
+                                    1,
+                                    0.9 + normalizedHeight * 0.1,
+                                    0.7 + normalizedHeight * 0.3
+                                );
+                                // Normal sun size during day
+                                child.scale.set(1, 1, 1);
+                            }
+                            
+                            // Update flare if it exists
+                            sky.children.forEach(flare => {
+                                if (flare.geometry && flare.geometry.type === 'PlaneGeometry') {
+                                    flare.position.copy(child.position);
+                                    flare.lookAt(0, 0, 0);
+                                    flare.visible = child.visible;
+                                    
+                                    // Adjust flare color to match sun
+                                    if (flare.material) {
+                                        flare.material.color.copy(child.material.color);
+                                        
+                                        // Adjust flare opacity based on time of day
+                                        if (timeOfDay < 0.3 || timeOfDay > 0.7) {
+                                            flare.material.opacity = 0.6; // More visible at dawn/dusk
+                                        } else {
+                                            flare.material.opacity = 0.4; // Less visible at midday
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+            
+            // Update directional light to match sun with improved transitions
+            if (directionalLight) {
+                const angle = (timeOfDay * Math.PI * 2) - Math.PI/2;
+                directionalLight.position.x = Math.cos(angle) * 10;
+                directionalLight.position.y = Math.max(0.5, Math.sin(angle) * 10); // Keep light slightly above horizon
+                directionalLight.position.z = 5;
+                
+                // Adjust light intensity based on time of day with smoother transitions
+                if (timeOfDay >= 0.3 && timeOfDay <= 0.7) {
+                    // Full intensity during day
+                    directionalLight.intensity = 1.2;
+                } else if (timeOfDay > 0.2 && timeOfDay < 0.3) {
+                    // Dawn transition
+                    const t = (timeOfDay - 0.2) / 0.1;
+                    directionalLight.intensity = 0.2 + t * 1.0;
+                } else if (timeOfDay > 0.7 && timeOfDay < 0.8) {
+                    // Dusk transition
+                    const t = (timeOfDay - 0.7) / 0.1;
+                    directionalLight.intensity = 1.2 - t * 1.0;
+                } else {
+                    // Night
+                    directionalLight.intensity = 0.2;
+                }
+                
+                // Adjust light color with improved transitions
+                if (timeOfDay >= 0.2 && timeOfDay < 0.3) {
+                    // Dawn: warm orange light
+                    const t = (timeOfDay - 0.2) / 0.1;
+                    const color = new THREE.Color(0xFFB74D); // Orange
+                    const dayColor = new THREE.Color(0xFFFFFF); // White
+                    color.lerp(dayColor, t);
+                    directionalLight.color.copy(color);
+                } else if (timeOfDay >= 0.3 && timeOfDay <= 0.7) {
+                    // Day: white light
+                    directionalLight.color.setHex(0xFFFFFF);
+                } else if (timeOfDay > 0.7 && timeOfDay < 0.8) {
+                    // Dusk: warm orange light
+                    const t = (timeOfDay - 0.7) / 0.1;
+                    const color = new THREE.Color(0xFFFFFF); // White
+                    const duskColor = new THREE.Color(0xFFB74D); // Orange
+                    color.lerp(duskColor, t);
+                    directionalLight.color.copy(color);
+                } else {
+                    // Night: blueish light (moonlight)
+                    directionalLight.color.setHex(0x7AAFFF);
+                }
+            }
+            
+            // Update ambient light based on time of day with smoother transitions
+            if (ambientLight) {
+                if (timeOfDay >= 0.3 && timeOfDay <= 0.7) {
+                    // Day
+                    ambientLight.intensity = 0.5;
+                    ambientLight.color.setHex(0x404040);
+                } else if (timeOfDay > 0.2 && timeOfDay < 0.3) {
+                    // Dawn transition
+                    const t = (timeOfDay - 0.2) / 0.1;
+                    ambientLight.intensity = 0.2 + t * 0.3;
+                    const nightColor = new THREE.Color(0x101020); // Dark blue
+                    const dayColor = new THREE.Color(0x404040); // Grey
+                    nightColor.lerp(dayColor, t);
+                    ambientLight.color.copy(nightColor);
+                } else if (timeOfDay > 0.7 && timeOfDay < 0.8) {
+                    // Dusk transition
+                    const t = (timeOfDay - 0.7) / 0.1;
+                    ambientLight.intensity = 0.5 - t * 0.3;
+                    const dayColor = new THREE.Color(0x404040); // Grey
+                    const nightColor = new THREE.Color(0x101020); // Dark blue
+                    dayColor.lerp(nightColor, t);
+                    ambientLight.color.copy(dayColor);
+                } else {
+                    // Night
+                    ambientLight.intensity = 0.2;
+                    ambientLight.color.setHex(0x101020);
+                }
+            }
+            
+            // Update spotlight to follow player and adjust based on time of day
+            if (spotlight) {
+                // Position spotlight to follow player
+                spotlight.position.x = character.position.x;
+                spotlight.position.z = character.position.z - 5;
+                
+                // Adjust spotlight properties based on time of day
+                if (isDaytime) {
+                    spotlight.intensity = 0.5; // Less intense during day
+                    spotlight.distance = 40;
+                } else {
+                    spotlight.intensity = 1.0; // More intense at night
+                    spotlight.distance = 60;
+                }
+            }
+            
+            // Update point lights with improved transitions
+            scene.children.forEach(child => {
+                if (child.type === 'PointLight') {
+                    // Make colored lights more prominent at night with smooth transitions
+                    if (timeOfDay >= 0.3 && timeOfDay <= 0.7) {
+                        // Day
+                        child.intensity = child.userData && child.userData.dayIntensity ? 
+                            child.userData.dayIntensity : 0.3;
+                    } else if (timeOfDay > 0.2 && timeOfDay < 0.3) {
+                        // Dawn transition
+                        const t = (timeOfDay - 0.2) / 0.1;
+                        const nightIntensity = child.userData && child.userData.nightIntensity ? 
+                            child.userData.nightIntensity : 0.8;
+                        const dayIntensity = child.userData && child.userData.dayIntensity ? 
+                            child.userData.dayIntensity : 0.3;
+                        child.intensity = nightIntensity - t * (nightIntensity - dayIntensity);
+                    } else if (timeOfDay > 0.7 && timeOfDay < 0.8) {
+                        // Dusk transition
+                        const t = (timeOfDay - 0.7) / 0.1;
+                        const dayIntensity = child.userData && child.userData.dayIntensity ? 
+                            child.userData.dayIntensity : 0.3;
+                        const nightIntensity = child.userData && child.userData.nightIntensity ? 
+                            child.userData.nightIntensity : 0.8;
+                        child.intensity = dayIntensity + t * (nightIntensity - dayIntensity);
+                    } else {
+                        // Night
+                        child.intensity = child.userData && child.userData.nightIntensity ? 
+                            child.userData.nightIntensity : 0.8;
+                    }
+                }
+            });
+            
+            // Update fog color based on time of day
+            if (scene.fog) {
+                if (isDaytime) {
+                    scene.fog.color.setHex(0x115522); // Forest green during day
+                } else {
+                    scene.fog.color.setHex(0x0A1020); // Dark blue at night
+                }
+            }
+        }
+        
+        // Toggle rain effect
+        function toggleRain() {
+            isRaining = !isRaining;
+            
+            if (isRaining) {
+                // Create rain if it doesn't exist
+                if (!scene.userData.rainEffect) {
+                    scene.userData.rainEffect = createRainEffect();
+                    scene.add(scene.userData.rainEffect);
+                }
+                
+                // Make rain visible
+                scene.userData.rainEffect.visible = true;
+                
+                // Adjust ambient sounds for rain
+                if (sounds['rain'] && !rainSoundSource && audioContext) {
+                    rainSoundSource = audioContext.createBufferSource();
+                    rainSoundSource.buffer = sounds['rain'];
+                    rainSoundSource.loop = true;
+                    
+                    rainGainNode = audioContext.createGain();
+                    rainGainNode.gain.value = 0.3 * masterVolume;
+                    
+                    rainSoundSource.connect(rainGainNode);
+                    rainGainNode.connect(audioContext.destination);
+                    rainSoundSource.start(0);
+                }
+                
+                // Reduce bird sounds during rain
+                if (birdsGainNode) {
+                    birdsGainNode.gain.value = 0.05 * masterVolume;
+                }
+            } else {
+                // Hide rain
+                if (scene.userData.rainEffect) {
+                    scene.userData.rainEffect.visible = false;
+                }
+                
+                // Stop rain sound
+                if (rainSoundSource) {
+                    rainSoundSource.stop();
+                    rainSoundSource = null;
+                }
+                
+                // Restore bird sounds
+                if (birdsGainNode) {
+                    birdsGainNode.gain.value = 0.2 * masterVolume;
+                }
+            }
+        }
+        
+        // Create falling leaves
+        const fallingLeavesEffect = createFallingLeaves();
+        scene.add(fallingLeavesEffect);
+        
+        // Add rain sound
+        let rainSoundSource = null;
+        let rainGainNode = null;
+        
+        // Load rain sound
+        if (audioContext) {
+            loadSound('rain', 'https://freesound.org/data/previews/346/346170_5121236-lq.mp3');
+        }
+        
+        // Add weather toggle button
+        function addWeatherControls() {
+            const controlsContainer = document.createElement('div');
+            controlsContainer.style.position = 'absolute';
+            controlsContainer.style.bottom = '10px';
+            controlsContainer.style.right = '10px';
+            controlsContainer.style.display = 'flex';
+            controlsContainer.style.flexDirection = 'column';
+            controlsContainer.style.gap = '5px';
+            controlsContainer.style.zIndex = '1000';
+            
+            // Rain toggle button
+            const weatherButton = document.createElement('button');
+            weatherButton.textContent = 'Toggle Rain';
+            weatherButton.style.padding = '8px 12px';
+            weatherButton.style.backgroundColor = '#4CAF50';
+            weatherButton.style.color = 'white';
+            weatherButton.style.border = 'none';
+            weatherButton.style.borderRadius = '4px';
+            weatherButton.style.cursor = 'pointer';
+            
+            weatherButton.addEventListener('click', toggleRain);
+            controlsContainer.appendChild(weatherButton);
+            
+            // Time of day control
+            const timeButton = document.createElement('button');
+            timeButton.textContent = 'Change Time';
+            timeButton.style.padding = '8px 12px';
+            timeButton.style.backgroundColor = '#2196F3';
+            timeButton.style.color = 'white';
+            timeButton.style.border = 'none';
+            timeButton.style.borderRadius = '4px';
+            timeButton.style.cursor = 'pointer';
+            
+            timeButton.addEventListener('click', changeTimeOfDay);
+            controlsContainer.appendChild(timeButton);
+            
+            document.body.appendChild(controlsContainer);
+        }
+        
+        // Function to change time of day
+        function changeTimeOfDay() {
+            // Cycle through different times: dawn, day, dusk, night
+            if (timeOfDay < 0.25) {
+                // Currently night, change to dawn
+                timeOfDay = 0.25;
+            } else if (timeOfDay < 0.5) {
+                // Currently dawn, change to day
+                timeOfDay = 0.5;
+            } else if (timeOfDay < 0.75) {
+                // Currently day, change to dusk
+                timeOfDay = 0.75;
+            } else {
+                // Currently dusk, change to night
+                timeOfDay = 0;
+            }
+            
+            // Force immediate update
+            updateTimeOfDay();
+            
+            // Play a sound effect for time change
+            if (soundEnabled && audioContext) {
+                playSound('colorChange', { 
+                    volume: 0.4, 
+                    rate: 0.7 + timeOfDay * 0.6 
+                });
+            }
+        }
+        
+        // Add weather controls
+        addWeatherControls();
+
+        // Create a segment of the path
+        function createSegment() {
+            const segment = new THREE.Group();
+            
+            // Determine terrain type for this segment
+            const terrainType = getRandomTerrainMaterial();
+            
+            // Create detailed forest floor with the selected terrain type
+            const floor = createDetailedForestFloor(10, 100, terrainType.type);
+            segment.add(floor);
+            
+            // Add tree canopy ceiling
+            const ceiling = new THREE.Mesh(floorGeometry, canopyMaterial);
+            ceiling.rotation.x = Math.PI / 2; // Lay flat but upside down
+            ceiling.position.y = 5;
+            if (!lowDetailMode) ceiling.receiveShadow = true;
+            segment.add(ceiling);
+            
+            // Add forest decorations based on terrain type
+            if (terrainType.type === 'grass') {
+                // Add trees on grass terrain
+                const treeCount = lowDetailMode ? 2 : 4;
+                for (let i = 0; i < treeCount; i++) {
+                    const tree = createTree(0.8 + Math.random() * 0.4);
+                    // Position trees along the sides
+                    const side = Math.random() > 0.5 ? 1 : -1;
+                    const offset = 3.5 + Math.random() * 1;
+                    tree.position.set(side * offset, 0, -Math.random() * 90 - 5);
+                    segment.add(tree);
+                }
+                
+                // Add bushes and flowers
+                const bushCount = lowDetailMode ? 3 : 6;
+                for (let i = 0; i < bushCount; i++) {
+                    const bush = createBush(0.6 + Math.random() * 0.4);
+                    const side = Math.random() > 0.5 ? 1 : -1;
+                    const offset = 2.5 + Math.random() * 2;
+                    bush.position.set(side * offset, 0, -Math.random() * 90 - 5);
+                    segment.add(bush);
+                    
+                    // Add flowers near some bushes
+                    if (Math.random() > 0.5) {
+                        const flowers = createFlowers(0.8 + Math.random() * 0.4);
+                        flowers.position.copy(bush.position);
+                        flowers.position.x += (Math.random() - 0.5) * 0.5;
+                        flowers.position.z += (Math.random() - 0.5) * 0.5;
+                        segment.add(flowers);
+                    }
+                }
+            } else if (terrainType.type === 'river') {
+                // Add rocks and waterfalls on river terrain
+                const rockCount = lowDetailMode ? 3 : 6;
+                for (let i = 0; i < rockCount; i++) {
+                    const rock = createRock(0.4 + Math.random() * 0.6);
+                    const side = Math.random() > 0.5 ? 1 : -1;
+                    const offset = 2 + Math.random() * 2.5;
+                    rock.position.set(side * offset, 0, -Math.random() * 90 - 5);
+                    segment.add(rock);
+                }
+                
+                // Add a waterfall (less frequent)
+                if (Math.random() > 0.7) {
+                    const waterfall = createWaterfall(1 + Math.random() * 0.5);
+                    const side = Math.random() > 0.5 ? 1 : -1;
+                    waterfall.position.set(side * 4, 0, -Math.random() * 70 - 20);
+                    segment.add(waterfall);
+                }
+            } else if (terrainType.type === 'land') {
+                // Add rocks and sparse vegetation on land terrain
+                const rockCount = lowDetailMode ? 4 : 8;
+                for (let i = 0; i < rockCount; i++) {
+                    const rock = createRock(0.3 + Math.random() * 0.7);
+                    const side = Math.random() > 0.3 ? (Math.random() > 0.5 ? 1 : -1) : 0; // Some rocks in the middle
+                    const offset = side === 0 ? (Math.random() * 4 - 2) : (3 + Math.random() * 1.5) * side;
+                    rock.position.set(offset, 0, -Math.random() * 90 - 5);
+                    segment.add(rock);
+                }
+                
+                // Add sparse trees
+                const treeCount = lowDetailMode ? 1 : 2;
+                for (let i = 0; i < treeCount; i++) {
+                    const tree = createTree(0.7 + Math.random() * 0.3);
+                    const side = Math.random() > 0.5 ? 1 : -1;
+                    const offset = 4 + Math.random() * 0.5;
+                    tree.position.set(side * offset, 0, -Math.random() * 90 - 5);
+                    segment.add(tree);
+                }
+            }
+            
+            // Add obstacles and bamboo
+            addObstaclesAndBamboo(segment, terrainType.type);
+            
+            return segment;
+        }
+
+        // Add sound test button to the start screen
+        function addSoundTestButton() {
+            const startScreen = document.getElementById('startScreen');
+            
+            const soundTestButton = document.createElement('button');
+            soundTestButton.textContent = 'Test Sound';
+            soundTestButton.style.marginTop = '10px';
+            soundTestButton.style.padding = '10px 20px';
+            soundTestButton.style.backgroundColor = '#FF9800';
+            soundTestButton.style.color = 'white';
+            soundTestButton.style.border = 'none';
+            soundTestButton.style.borderRadius = '4px';
+            soundTestButton.style.cursor = 'pointer';
+            soundTestButton.style.fontFamily = 'Arial, sans-serif';
+            soundTestButton.style.fontSize = '16px';
+            
+            soundTestButton.addEventListener('click', function() {
+                // Initialize audio context
+                initAudioContext();
+                
+                // Play a test sound after a short delay to ensure context is ready
+                setTimeout(() => {
+                    playSound('coin', { volume: 1.0 });
+                    
+                    // Show feedback
+                    const feedback = document.createElement('div');
+                    feedback.textContent = 'Sound test played!';
+                    feedback.style.marginTop = '10px';
+                    feedback.style.color = '#4CAF50';
+                    feedback.style.fontWeight = 'bold';
+                    
+                    startScreen.appendChild(feedback);
+                    
+                    // Remove feedback after 2 seconds
+                    setTimeout(() => {
+                        startScreen.removeChild(feedback);
+                    }, 2000);
+                }, 100);
+            });
+            
+            startScreen.appendChild(soundTestButton);
+        }
+        
+        // Add sound test button
+        addSoundTestButton();
+        
+        // Add event listeners for keyboard controls
+        document.addEventListener('keydown', function(event) {
+            // Initialize audio on first key press
+            if (!audioContext) {
+                initAudioContext();
+            }
+            
+            if (!gameRunning) return;
+            
+            if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'A') {
+                // Move left
+                if (lane > -1) lane--;
+            } else if (event.key === 'ArrowRight' || event.key === 'd' || event.key === 'D') {
+                // Move right
+                if (lane < 1) lane++;
+            } else if ((event.key === 'ArrowUp' || event.key === 'w' || event.key === 'W' || event.key === ' ') && !isJumping) {
+                // Jump
+                isJumping = true;
+                jumpVelocity = 0.2;
+                
+                // Play jump sound
+                playSound('jump', { volume: 0.5 });
+            }
+        });
+
+        // Add sound debug panel
+        function addSoundDebugPanel() {
+            const debugPanel = document.createElement('div');
+            debugPanel.id = 'soundDebugPanel';
+            debugPanel.style.position = 'absolute';
+            debugPanel.style.top = '10px';
+            debugPanel.style.left = '10px';
+            debugPanel.style.backgroundColor = 'rgba(0,0,0,0.7)';
+            debugPanel.style.color = 'white';
+            debugPanel.style.padding = '10px';
+            debugPanel.style.borderRadius = '5px';
+            debugPanel.style.fontFamily = 'monospace';
+            debugPanel.style.fontSize = '12px';
+            debugPanel.style.zIndex = '1000';
+            debugPanel.style.maxWidth = '300px';
+            debugPanel.style.maxHeight = '200px';
+            debugPanel.style.overflow = 'auto';
+            
+            // Add toggle button
+            const toggleButton = document.createElement('button');
+            toggleButton.textContent = 'Sound Debug';
+            toggleButton.style.position = 'absolute';
+            toggleButton.style.top = '10px';
+            toggleButton.style.left = '10px';
+            toggleButton.style.padding = '5px 10px';
+            toggleButton.style.backgroundColor = '#F44336';
+            toggleButton.style.color = 'white';
+            toggleButton.style.border = 'none';
+            toggleButton.style.borderRadius = '4px';
+            toggleButton.style.cursor = 'pointer';
+            toggleButton.style.zIndex = '1001';
+            
+            // Initially hide the debug panel
+            debugPanel.style.display = 'none';
+            
+            // Toggle debug panel visibility
+            toggleButton.addEventListener('click', function() {
+                if (debugPanel.style.display === 'none') {
+                    debugPanel.style.display = 'block';
+                    updateDebugPanel();
+                } else {
+                    debugPanel.style.display = 'none';
+                }
+            });
+            
+            document.body.appendChild(toggleButton);
+            document.body.appendChild(debugPanel);
+            
+            // Update debug panel with current audio state
+            function updateDebugPanel() {
+                if (debugPanel.style.display === 'none') return;
+                
+                let html = '<h3>Sound Debug Info</h3>';
+                
+                // Audio context info
+                html += '<div><strong>Audio Context:</strong> ';
+                if (audioContext) {
+                    html += `${audioContext.state} (${audioContext.sampleRate}Hz)</div>`;
+                } else {
+                    html += 'Not initialized</div>';
+                }
+                
+                // Loaded sounds
+                html += '<div><strong>Loaded Sounds:</strong> ';
+                const soundNames = Object.keys(sounds);
+                if (soundNames.length > 0) {
+                    html += soundNames.join(', ');
+                } else {
+                    html += 'None';
+                }
+                html += '</div>';
+                
+                // Sound settings
+                html += `<div><strong>Sound Enabled:</strong> ${soundEnabled}</div>`;
+                html += `<div><strong>Music Enabled:</strong> ${musicEnabled}</div>`;
+                html += `<div><strong>Master Volume:</strong> ${masterVolume.toFixed(2)}</div>`;
+                
+                // Active sound sources
+                html += '<div><strong>Active Sources:</strong> ';
+                let activeSources = [];
+                if (birdsSoundSource) activeSources.push('birds');
+                if (riverSoundSource) activeSources.push('river');
+                if (windSoundSource) activeSources.push('wind');
+                if (rainSoundSource) activeSources.push('rain');
+                
+                if (activeSources.length > 0) {
+                    html += activeSources.join(', ');
+                } else {
+                    html += 'None';
+                }
+                html += '</div>';
+                
+                // Test sound buttons
+                html += '<div style="margin-top: 10px;">';
+                html += '<button id="testCoin" style="margin-right: 5px;">Test Coin</button>';
+                html += '<button id="testJump" style="margin-right: 5px;">Test Jump</button>';
+                html += '<button id="testPowerup">Test Powerup</button>';
+                html += '</div>';
+                
+                debugPanel.innerHTML = html;
+                
+                // Add event listeners to test buttons
+                document.getElementById('testCoin').addEventListener('click', function() {
+                    playSound('coin', { volume: 1.0 });
+                });
+                
+                document.getElementById('testJump').addEventListener('click', function() {
+                    playSound('jump', { volume: 1.0 });
+                });
+                
+                document.getElementById('testPowerup').addEventListener('click', function() {
+                    playSound('powerup', { volume: 1.0 });
+                });
+                
+                // Schedule next update
+                setTimeout(updateDebugPanel, 1000);
+            }
+        }
+        
+        // Add sound debug panel
+        addSoundDebugPanel();
+    </script>
+</body>
+</html>
